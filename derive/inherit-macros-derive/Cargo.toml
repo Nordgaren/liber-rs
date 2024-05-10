@@ -1,0 +1,13 @@
+[package]
+name = "inhert-macros-derive"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+inhert-macros-core = { version = "0.1.0", path = "../inherit-macros-core" }
+proc-macro-error = "1.0"
+proc-macro2 = "1.0"
+

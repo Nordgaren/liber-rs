@@ -1,7 +1,10 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
-use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4TaskBaseClass, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
-use std::ops::Deref;
+use crate::from::FD4::{
+    DLRuntimeClass, FD4ComponentBaseClass, FD4TaskBaseClass, FD4TaskBaseType, FD4TaskBaseVTable,
+    FD4TaskData,
+};
 use crate::{CppClass, VTable};
+use std::ops::Deref;
 
 #[allow(non_camel_case_types)]
 pub type cstgi = u32;
@@ -29,7 +32,6 @@ impl<C: VTable> Deref for CSEzTaskVTable<C> {
 
 pub type CSEzTask = CppClass<CSEzTaskType>;
 //const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x1C);
-
 
 impl CSEzTaskClass for CSEzTask {}
 
@@ -96,7 +98,7 @@ impl FD4TaskBaseClass for CSEzTask {
 }
 impl FD4ComponentBaseClass for CSEzTask {}
 
-pub trait CSEzTaskClass : FD4TaskBaseClass {
+pub trait CSEzTaskClass: FD4TaskBaseClass {
     extern "C" fn eztask_execute(&self, data: &FD4TaskData) {
         self.execute(data)
     }
@@ -105,7 +107,6 @@ pub trait CSEzTaskClass : FD4TaskBaseClass {
     }
     extern "C" fn free_task(&self, task_group: CSTaskGroup) {
         todo!("{:?}", task_group)
-
     }
 }
 
@@ -116,4 +117,3 @@ pub struct CSEzTaskProxy {
 }
 const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0xC);
 const _: () = assert!(std::mem::size_of::<CSTaskGroup>() == 0x4);
-

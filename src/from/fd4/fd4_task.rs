@@ -1,9 +1,11 @@
+use crate::from::CS;
+use crate::from::FD4::time::FD4Time;
+use crate::from::FD4::{
+    DLRuntimeClass, FD4ComponentBaseClass, FD4ComponentBaseType, FD4ComponentBaseVTable,
+};
+use crate::{CppClass, VTable};
 use std::ffi::c_void;
 use std::ops::Deref;
-use crate::from::CS;
-use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4ComponentBaseType, FD4ComponentBaseVTable};
-use crate::from::FD4::time::FD4Time;
-use crate::{CppClass, VTable};
 
 pub type ExecuteFn<C> = extern "C" fn(_this: &CppClass<C>, data: &FD4TaskData);
 
@@ -16,7 +18,10 @@ pub struct FD4TaskBaseVTable<C: VTable> {
     pub execute: ExecuteFn<C>,
 }
 const _: () = assert!(std::mem::size_of::<FD4TaskBaseVTable<FD4TaskBaseType>>() == 0x18);
-impl<C: VTable> FD4TaskBaseVTable<C> where CppClass<C>: FD4TaskBaseClass {
+impl<C: VTable> FD4TaskBaseVTable<C>
+where
+    CppClass<C>: FD4TaskBaseClass,
+{
     pub const fn new() -> Self {
         Self {
             fd4component_base_vtable: FD4ComponentBaseVTable::new(),
@@ -25,7 +30,7 @@ impl<C: VTable> FD4TaskBaseVTable<C> where CppClass<C>: FD4TaskBaseClass {
     }
 }
 
-impl FD4ComponentBaseClass for FD4TaskBase { }
+impl FD4ComponentBaseClass for FD4TaskBase {}
 
 impl DLRuntimeClass for FD4TaskBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
@@ -55,7 +60,10 @@ const _: () = assert!(std::mem::size_of::<FD4TaskBaseType>() == 0x8);
 
 impl Default for FD4TaskBaseType {
     fn default() -> Self {
-        Self { base: Default::default(), unk: std::ptr::null() }
+        Self {
+            base: Default::default(),
+            unk: std::ptr::null(),
+        }
     }
 }
 
@@ -77,9 +85,7 @@ pub trait FD4TaskBaseClass: FD4ComponentBaseClass {
     extern "C" fn get_runtime_class(&self, data: &FD4TaskData) {
         todo!("{data:?}")
     }
-    extern "C" fn destructor(&self) {
-
-    }
+    extern "C" fn destructor(&self) {}
 }
 
 impl FD4TaskBaseClass for FD4TaskBase {

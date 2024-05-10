@@ -1,8 +1,10 @@
-use widestring::widecstr;
-use crate::{CppClass, DestructorFn, VTable};
 use crate::from::DLRF::DLRuntimeClassType;
+use crate::{CppClass, DestructorFn, VTable};
+use std::ffi::CStr;
+use widestring::widecstr;
 
-pub type GetRuntimeClassFn<C> = extern "C" fn(&CppClass<C>) -> &'static crate::from::DLRF::DLRuntimeClass;
+pub type GetRuntimeClassFn<C> =
+    extern "C" fn(&CppClass<C>) -> &'static crate::from::DLRF::DLRuntimeClass;
 
 pub type FD4ComponentBase = CppClass<FD4ComponentBaseType>;
 const _: () = assert!(std::mem::size_of::<CppClass<FD4ComponentBaseType>>() == 0x8);
@@ -17,7 +19,10 @@ pub struct FD4ComponentBaseVTable<C: VTable> {
 }
 const _: () = assert!(std::mem::size_of::<FD4ComponentBaseVTable<FD4ComponentBaseType>>() == 0x10);
 
-impl<C: VTable> FD4ComponentBaseVTable<C> where CppClass<C>: FD4ComponentBaseClass {
+impl<C: VTable> FD4ComponentBaseVTable<C>
+where
+    CppClass<C>: FD4ComponentBaseClass,
+{
     pub const fn new() -> Self {
         Self {
             get_runtime_class: <CppClass<C> as DLRuntimeClass>::get_runtime_class,
@@ -49,15 +54,19 @@ pub trait DLRuntimeClass {
 }
 impl DLRuntimeClass for FD4ComponentBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
-        static  DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
-            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new("FD4ComponentBase\0", widecstr!("FD4ComponentBase")));
+        static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
+            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+                match CStr::from_bytes_with_nul("FD4ComponentBase\0".as_bytes()) {
+                    Ok(cstr) => cstr,
+                    Err(_) => unreachable!(),
+                },
+                widecstr!("FD4ComponentBase"),
+            ));
         &DL_RUNTIME_CLASS
     }
 }
 
-pub trait FD4ComponentBaseClass : DLRuntimeClass {
-    extern "C" fn destructor(&self) {
-
-    }
+pub trait FD4ComponentBaseClass: DLRuntimeClass {
+    extern "C" fn destructor(&self) {}
 }
 impl FD4ComponentBaseClass for FD4ComponentBase {}

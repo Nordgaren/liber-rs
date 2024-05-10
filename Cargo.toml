@@ -1,0 +1,11 @@
+[package]
+name = "liber-rs"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["derive/inherit-macros-derive", "derive/inherit-macros-core"]
+
+[dependencies]
+inhert-macros-derive = { version = "0.1.0", path = "derive/inherit-macros-derive" }
+widestring = "1.1.0"

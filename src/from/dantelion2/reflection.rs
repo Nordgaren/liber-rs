@@ -1,7 +1,8 @@
-use widestring::WideCStr;
 use crate::{CppClass, VTable};
+use std::ffi::{c_char, CStr};
+use widestring::WideCStr;
 
-pub type ClassNameFn<C> = extern "C" fn(&CppClass<C>) -> &'static u8;
+pub type ClassNameFn<C> = extern "C" fn(&CppClass<C>) -> &'static c_char;
 pub type ClassNameWFn<C> = extern "C" fn(&CppClass<C>) -> &'static u16;
 pub type RefByteFn<C> = extern "C" fn(&CppClass<C>) -> &'static u8;
 pub type UnkAlwaysFalseFn<C> = extern "C" fn(&CppClass<C>) -> bool;
@@ -24,7 +25,10 @@ pub struct DLRuntimeClassVTable<C: VTable> {
 
 const _: () = assert!(std::mem::size_of::<DLRuntimeClassVTable<DLRuntimeClassType>>() == 0x48);
 
-impl<C: VTable> DLRuntimeClassVTable<C> where CppClass<C>: DLRuntimeClassTrait {
+impl<C: VTable> DLRuntimeClassVTable<C>
+where
+    CppClass<C>: DLRuntimeClassTrait,
+{
     pub const fn new() -> Self {
         Self {
             class_name: <CppClass<C> as DLRuntimeClassTrait>::class_name,
@@ -43,7 +47,7 @@ impl<C: VTable> DLRuntimeClassVTable<C> where CppClass<C>: DLRuntimeClassTrait {
 #[repr(C)]
 #[derive(Debug)]
 pub struct DLRuntimeClassType {
-    _class_name: &'static u8,
+    _class_name: &'static c_char,
     _class_name_w: &'static u16,
 }
 
@@ -54,17 +58,22 @@ impl VTable for DLRuntimeClassType {
     const TABLE: &'static Self::Table = &DLRuntimeClassVTable::new();
 }
 
-
 impl DLRuntimeClassType {
-    pub const fn new(class_name: &'static str, class_name_w: &'static WideCStr) -> DLRuntimeClassType {
+    pub const fn new(
+        class_name: &'static CStr,
+        class_name_w: &'static WideCStr,
+    ) -> DLRuntimeClassType {
         unsafe {
-            Self { _class_name: &*class_name.as_ptr(), _class_name_w: &*class_name_w.as_ptr() }
+            Self {
+                _class_name: &*class_name.as_ptr(),
+                _class_name_w: &*class_name_w.as_ptr(),
+            }
         }
     }
 }
 
 pub trait DLRuntimeClassTrait {
-    extern "C" fn class_name(&self) -> &'static u8;
+    extern "C" fn class_name(&self) -> &'static c_char;
     extern "C" fn class_name_w(&self) -> &'static u16;
     extern "C" fn ref_byte1(&self) -> &'static u8;
     extern "C" fn ref_byte2(&self) -> &'static u8;
@@ -76,7 +85,7 @@ pub trait DLRuntimeClassTrait {
 }
 
 impl DLRuntimeClassTrait for DLRuntimeClass {
-    extern "C" fn class_name(&self) -> &'static u8 {
+    extern "C" fn class_name(&self) -> &'static c_char {
         self._class_name
     }
     extern "C" fn class_name_w(&self) -> &'static u16 {
