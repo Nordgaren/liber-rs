@@ -1,7 +1,8 @@
-use crate::from::DLRF::DLRuntimeClassType;
-use crate::{CppClass, DestructorFn, VTable};
-use std::ffi::CStr;
+use cstr::cstr;
 use widestring::widecstr;
+
+use crate::{CppClass, DestructorFn, VTable};
+use crate::from::DLRF::DLRuntimeClassType;
 
 pub type GetRuntimeClassFn<C> =
     extern "C" fn(&CppClass<C>) -> &'static crate::from::DLRF::DLRuntimeClass;
@@ -56,10 +57,7 @@ impl DLRuntimeClass for FD4ComponentBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
         static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
             crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
-                match CStr::from_bytes_with_nul("FD4ComponentBase\0".as_bytes()) {
-                    Ok(cstr) => cstr,
-                    Err(_) => unreachable!(),
-                },
+                cstr!("FD4ComponentBase"),
                 widecstr!("FD4ComponentBase"),
             ));
         &DL_RUNTIME_CLASS

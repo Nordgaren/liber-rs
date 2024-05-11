@@ -4,6 +4,8 @@ use std::ops::Deref;
 pub mod from;
 
 pub use inhert_macros_derive::CSEzTask;
+pub use cstr::cstr;
+pub use widestring::widecstr;
 
 pub type DestructorFn<C> = extern "C" fn(&CppClass<C>);
 

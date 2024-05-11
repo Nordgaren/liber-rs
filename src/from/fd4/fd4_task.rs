@@ -1,11 +1,14 @@
-use crate::from::CS;
-use crate::from::FD4::time::FD4Time;
-use crate::from::FD4::{
-    DLRuntimeClass, FD4ComponentBaseClass, FD4ComponentBaseType, FD4ComponentBaseVTable,
-};
-use crate::{CppClass, VTable};
 use std::ffi::c_void;
 use std::ops::Deref;
+
+use cstr::cstr;
+use widestring::widecstr;
+
+use crate::{CppClass, VTable};
+use crate::from::CS;
+use crate::from::DLRF::DLRuntimeClassType;
+use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4ComponentBaseType, FD4ComponentBaseVTable};
+use crate::from::FD4::time::FD4Time;
 
 pub type ExecuteFn<C> = extern "C" fn(_this: &CppClass<C>, data: &FD4TaskData);
 
@@ -34,7 +37,12 @@ impl FD4ComponentBaseClass for FD4TaskBase {}
 
 impl DLRuntimeClass for FD4TaskBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
-        todo!()
+        static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
+            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+                cstr!("FD4TaskBase"),
+                widecstr!("FD4TaskBase"),
+            ));
+        &DL_RUNTIME_CLASS
     }
 }
 

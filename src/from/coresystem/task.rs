@@ -1,10 +1,10 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
-use crate::from::FD4::{
-    DLRuntimeClass, FD4ComponentBaseClass, FD4TaskBaseClass, FD4TaskBaseType, FD4TaskBaseVTable,
-    FD4TaskData,
-};
+use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4TaskBaseClass, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
 use crate::{CppClass, VTable};
 use std::ops::Deref;
+use cstr::cstr;
+use widestring::widecstr;
+use crate::from::DLRF::DLRuntimeClassType;
 
 #[allow(non_camel_case_types)]
 pub type cstgi = u32;
@@ -79,18 +79,33 @@ impl Deref for CSEzTaskType {
 
 impl VTable for CSEzTaskType {
     type Table = CSEzTaskVTable<CSEzTaskType>;
-    const TABLE: &'static Self::Table = &CSEzTaskVTable {
-        fd4task_base_vtable: FD4TaskBaseVTable::new(),
-        eztask_execute: CSEzTask::eztask_execute,
-        register_task: CSEzTask::register_task,
-        free_task: CSEzTask::free_task,
-    };
+    const TABLE: &'static Self::Table = &CSEzTaskVTable::new();
+}
+
+impl<C: VTable> CSEzTaskVTable<C>
+    where
+        CppClass<C>: CSEzTaskClass,
+{
+    pub const fn new() -> Self {
+        Self  {
+            fd4task_base_vtable: FD4TaskBaseVTable::new(),
+            eztask_execute: <CppClass<C> as CSEzTaskClass>::eztask_execute,
+            register_task: <CppClass<C> as CSEzTaskClass>::register_task,
+            free_task: <CppClass<C> as CSEzTaskClass>::free_task,
+        }
+    }
 }
 impl DLRuntimeClass for CSEzTask {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
-        todo!()
+        static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
+            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+                cstr!("CSEzTask"),
+                widecstr!("CSEzTask"),
+            ));
+        &DL_RUNTIME_CLASS
     }
 }
+
 impl FD4TaskBaseClass for CSEzTask {
     extern "C" fn execute(&self, data: &FD4TaskData) {
         todo!("{data:?}")

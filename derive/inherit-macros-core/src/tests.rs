@@ -1,10 +1,10 @@
 #![cfg(test)]
 
-use crate::derive_macro_impl;
+use crate::inherit_cs_ez_task_impl;
 use quote::quote;
 
 #[test]
 fn test() {
-    let after = derive_macro_impl(quote!());
+    let after = inherit_cs_ez_task_impl(quote!());
     assert_ne!(after.to_string(), "");
 }
