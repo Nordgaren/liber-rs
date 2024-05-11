@@ -14,57 +14,16 @@ pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
 fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error> {
     let input = parse2::<DeriveInput>(input)?;
 
-    let ident = check_structure_name(&input)?;
+    let ident = get_structure_name(&input)?;
 
     is_repr_c(&input)?;
     check_structure(&input)?;
 
-    let tokenstream = write_new_code(ident);
+    let tokenstream = inherit_cs_easy_task(ident);
     Ok(tokenstream)
 }
 
-fn check_structure(input: &DeriveInput) -> Result<(), Error> {
-    match &input.data {
-        Data::Struct(s) => {
-            let first = match &s.fields {
-                Fields::Named(n) => n.named.first().unwrap(),
-                Fields::Unnamed(u) => u.unnamed.first().unwrap(),
-                Fields::Unit => {
-                    return Err(Error::new(input.span(), "Unit types are not supported."))
-                }
-            };
-
-            if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
-                return Err(Error::new(
-                    first.ty.span(),
-                    "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
-                ));
-            }
-        }
-        _ => {
-            return Err(Error::new(
-                input.span(),
-                "Only structures are supported for inheriting `CSEzTask`.",
-            ))
-        }
-    }
-
-    Ok(())
-}
-
-fn check_structure_name(input: &DeriveInput) -> Result<String, Error> {
-    let ident = input.ident.to_string();
-    if &ident[ident.len() - 4..] != "Type" {
-        return Err(Error::new(
-            input.ident.span(),
-            "Derive must be used on a type that ends with the word 'Type'",
-        ));
-    }
-
-    Ok(ident)
-}
-
-fn write_new_code(ident: String) -> TokenStream {
+fn inherit_cs_easy_task(ident: String) -> TokenStream {
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
     let class_name_ident = format_ident!("{class_name}");
@@ -133,6 +92,18 @@ fn write_new_code(ident: String) -> TokenStream {
     tokenstream
 }
 
+fn get_structure_name(input: &DeriveInput) -> Result<String, Error> {
+    let ident = input.ident.to_string();
+    if &ident[ident.len() - 4..] != "Type" {
+        return Err(Error::new(
+            input.ident.span(),
+            "Derive must be used on a type that ends with the word 'Type'",
+        ));
+    }
+
+    Ok(ident)
+}
+
 fn is_repr_c(input: &DeriveInput) -> Result<TokenStream, Error> {
     has_repr_c_attr(input)?;
 
@@ -164,4 +135,33 @@ fn has_repr_c_attr(input: &DeriveInput) -> Result<(), Error> {
         input.span(),
         "Could not find `repr` attribute. Type must have `#[repr(C)]` attribute",
     ))
+}
+
+fn check_structure(input: &DeriveInput) -> Result<(), Error> {
+    match &input.data {
+        Data::Struct(s) => {
+            let first = match &s.fields {
+                Fields::Named(n) => n.named.first().unwrap(),
+                Fields::Unnamed(u) => u.unnamed.first().unwrap(),
+                Fields::Unit => {
+                    return Err(Error::new(input.span(), "Unit types are not supported."))
+                }
+            };
+
+            if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
+                return Err(Error::new(
+                    first.ty.span(),
+                    "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::new(
+                input.span(),
+                "Only structures are supported for inheriting `CSEzTask`.",
+            ))
+        }
+    }
+
+    Ok(())
 }
