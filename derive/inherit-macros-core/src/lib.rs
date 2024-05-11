@@ -33,10 +33,10 @@ fn inherit_cs_easy_task(ident: String) -> TokenStream {
         pub struct #class_name_ident(liber_rs::CppClass<#class_name_type_ident>);
 
         impl std::ops::Deref for #class_name_ident {
-            type Target = liber_rs::from::CS::CSEzTaskType;
+            type Target = liber_rs::CppClass<#class_name_type_ident>;
 
             fn deref(&self) -> &Self::Target {
-                &self.0.task
+                &self.0
             }
         }
     };
