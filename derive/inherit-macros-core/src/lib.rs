@@ -3,26 +3,68 @@
 mod tests;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, TokenStreamExt};
-use syn::{parse2, DeriveInput, Error};
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use syn::spanned::Spanned;
+use syn::{parse2, Data, DeriveInput, Error, Fields};
 
 pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
-    let input = match parse2::<DeriveInput>(input) {
-        Ok(syntax_tree) => syntax_tree,
-        Err(error) => return error.to_compile_error(),
-    };
+    inherit_cs_ez_task_internal(input).unwrap_or_else(|e| e.to_compile_error())
+}
 
-    let ident = input.ident.to_string();
-    if &ident[ident.len() - 4..] != "Type" {
-        return Error::new(
-            input.ident.span(),
-            "Derive must be used on a type that ends with the word 'Type'",
-        )
-            .to_compile_error();
+fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error> {
+    let input = parse2::<DeriveInput>(input)?;
+
+    let ident = check_structure_name(&input)?;
+
+    is_repr_c(&input)?;
+    check_structure(&input)?;
+
+    let tokenstream = write_new_code(ident);
+    Ok(tokenstream)
+}
+
+fn check_structure(input: &DeriveInput) -> Result<(), Error> {
+    match &input.data {
+        Data::Struct(s) => {
+            let first = match &s.fields {
+                Fields::Named(n) => n.named.first().unwrap(),
+                Fields::Unnamed(u) => u.unnamed.first().unwrap(),
+                Fields::Unit => {
+                    return Err(Error::new(input.span(), "Unit types are not supported."))
+                }
+            };
+
+            if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
+                return Err(Error::new(
+                    first.ty.span(),
+                    "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::new(
+                input.span(),
+                "Only structures are supported for inheriting `CSEzTask`.",
+            ))
+        }
     }
 
+    Ok(())
+}
 
+fn check_structure_name(input: &DeriveInput) -> Result<String, Error> {
+    let ident = input.ident.to_string();
+    if &ident[ident.len() - 4..] != "Type" {
+        return Err(Error::new(
+            input.ident.span(),
+            "Derive must be used on a type that ends with the word 'Type'",
+        ));
+    }
 
+    Ok(ident)
+}
+
+fn write_new_code(ident: String) -> TokenStream {
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
     let class_name_ident = format_ident!("{class_name}");
@@ -86,8 +128,40 @@ pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
             }
         }
     };
-    tokenstream.append_all(&[vtable, impls, reflection]);
-    eprintln!("{}", tokenstream);
 
+    tokenstream.append_all(&[vtable, impls, reflection]);
     tokenstream
+}
+
+fn is_repr_c(input: &DeriveInput) -> Result<TokenStream, Error> {
+    has_repr_c_attr(input)?;
+
+    // For the future. Need to make compile time checks for all fields of structure being `#[repr(C)]`.
+    // Might use bytemuck if I can, but I think that could possibly be broken if I re-export the derive
+    // macro or the trait I need.
+    Ok(TokenStream::new())
+}
+
+fn has_repr_c_attr(input: &DeriveInput) -> Result<(), Error> {
+    let attrs = &input.attrs;
+    for attr in attrs {
+        if attr.path.to_token_stream().to_string().to_lowercase() == "repr" {
+            let tokens = attr.tokens.to_string();
+            return if tokens.to_uppercase() == "(C)" {
+                Ok(())
+            } else {
+                Err(Error::new(
+                    input.span(),
+                    format!(
+                        "Found `#[repr{}]` attribute. Type must have `#[repr(C)]` attribute",
+                        tokens
+                    ),
+                ))
+            }
+        }
+    }
+    Err(Error::new(
+        input.span(),
+        "Could not find `repr` attribute. Type must have `#[repr(C)]` attribute",
+    ))
 }
