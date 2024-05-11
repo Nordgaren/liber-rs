@@ -1,7 +1,7 @@
 #[repr(i32)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum CSTaskGroup {
     INVALID = -1,
     FrameBegin = 0,
