@@ -1,8 +1,8 @@
 use cstr::cstr;
 use widestring::widecstr;
 
-use crate::{CppClass, DestructorFn, VTable};
 use crate::from::DLRF::DLRuntimeClassType;
+use crate::{CppClass, DestructorFn, VTable};
 
 pub type GetRuntimeClassFn<C> =
     extern "C" fn(&CppClass<C>) -> &'static crate::from::DLRF::DLRuntimeClass;
@@ -22,12 +22,12 @@ const _: () = assert!(std::mem::size_of::<FD4ComponentBaseVTable<FD4ComponentBas
 
 impl<C: VTable> FD4ComponentBaseVTable<C>
 where
-    CppClass<C>: FD4ComponentBaseClass,
+    CppClass<C>: FD4ComponentBaseTrait,
 {
     pub const fn new() -> Self {
         Self {
-            get_runtime_class: <CppClass<C> as DLRuntimeClass>::get_runtime_class,
-            destructor: <CppClass<C> as FD4ComponentBaseClass>::destructor,
+            get_runtime_class: <CppClass<C> as DLRuntimeClassTrait>::get_runtime_class,
+            destructor: <CppClass<C> as FD4ComponentBaseTrait>::destructor,
         }
     }
 }
@@ -50,13 +50,13 @@ impl VTable for FD4ComponentBaseType {
     };
 }
 
-pub trait DLRuntimeClass {
+pub trait DLRuntimeClassTrait {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass;
 }
-impl DLRuntimeClass for FD4ComponentBase {
+impl DLRuntimeClassTrait for FD4ComponentBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
         static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
-            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+            crate::from::DLRF::DLRuntimeClass::from_data(DLRuntimeClassType::new(
                 cstr!("FD4ComponentBase"),
                 widecstr!("FD4ComponentBase"),
             ));
@@ -64,7 +64,7 @@ impl DLRuntimeClass for FD4ComponentBase {
     }
 }
 
-pub trait FD4ComponentBaseClass: DLRuntimeClass {
+pub trait FD4ComponentBaseTrait: DLRuntimeClassTrait {
     extern "C" fn destructor(&self) {}
 }
-impl FD4ComponentBaseClass for FD4ComponentBase {}
+impl FD4ComponentBaseTrait for FD4ComponentBase {}

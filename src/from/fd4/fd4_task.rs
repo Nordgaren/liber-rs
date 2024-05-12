@@ -4,11 +4,13 @@ use std::ops::Deref;
 use cstr::cstr;
 use widestring::widecstr;
 
-use crate::{CppClass, VTable};
 use crate::from::CS;
 use crate::from::DLRF::DLRuntimeClassType;
-use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4ComponentBaseType, FD4ComponentBaseVTable};
 use crate::from::FD4::time::FD4Time;
+use crate::from::FD4::{
+    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4ComponentBaseType, FD4ComponentBaseVTable,
+};
+use crate::{CppClass, VTable};
 
 pub type ExecuteFn<C> = extern "C" fn(_this: &CppClass<C>, data: &FD4TaskData);
 
@@ -23,22 +25,22 @@ pub struct FD4TaskBaseVTable<C: VTable> {
 const _: () = assert!(std::mem::size_of::<FD4TaskBaseVTable<FD4TaskBaseType>>() == 0x18);
 impl<C: VTable> FD4TaskBaseVTable<C>
 where
-    CppClass<C>: FD4TaskBaseClass,
+    CppClass<C>: FD4TaskBaseTrait,
 {
     pub const fn new() -> Self {
         Self {
             fd4component_base_vtable: FD4ComponentBaseVTable::new(),
-            execute: <CppClass<C> as FD4TaskBaseClass>::execute,
+            execute: <CppClass<C> as FD4TaskBaseTrait>::execute,
         }
     }
 }
 
-impl FD4ComponentBaseClass for FD4TaskBase {}
+impl FD4ComponentBaseTrait for FD4TaskBase {}
 
-impl DLRuntimeClass for FD4TaskBase {
+impl DLRuntimeClassTrait for FD4TaskBase {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
         static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
-            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+            crate::from::DLRF::DLRuntimeClass::from_data(DLRuntimeClassType::new(
                 cstr!("FD4TaskBase"),
                 widecstr!("FD4TaskBase"),
             ));
@@ -88,7 +90,7 @@ impl VTable for FD4TaskBaseType {
     const TABLE: &'static Self::Table = &FD4TaskBaseVTable::new();
 }
 
-pub trait FD4TaskBaseClass: FD4ComponentBaseClass {
+pub trait FD4TaskBaseTrait: FD4ComponentBaseTrait {
     extern "C" fn execute(&self, data: &FD4TaskData);
     extern "C" fn get_runtime_class(&self, data: &FD4TaskData) {
         todo!("{data:?}")
@@ -96,7 +98,7 @@ pub trait FD4TaskBaseClass: FD4ComponentBaseClass {
     extern "C" fn destructor(&self) {}
 }
 
-impl FD4TaskBaseClass for FD4TaskBase {
+impl FD4TaskBaseTrait for FD4TaskBase {
     extern "C" fn execute(&self, data: &FD4TaskData) {
         todo!("{data:?}")
     }
@@ -109,4 +111,4 @@ pub struct FD4TaskData {
     task_group_id: CS::cstgi,
     seed: i32,
 }
-const _: () = assert!(std::mem::size_of::<FD4TaskData>() == 0xC);
+const _: () = assert!(std::mem::size_of::<FD4TaskData>() == 0x18);

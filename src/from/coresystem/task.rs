@@ -1,10 +1,13 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
-use crate::from::FD4::{DLRuntimeClass, FD4ComponentBaseClass, FD4TaskBaseClass, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
-use crate::{CppClass, VTable};
-use std::ops::Deref;
-use cstr::cstr;
-use widestring::widecstr;
 use crate::from::DLRF::DLRuntimeClassType;
+use crate::from::FD4::{
+    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType,
+    FD4TaskBaseVTable, FD4TaskData,
+};
+use crate::{CppClass, VTable};
+use cstr::cstr;
+use std::ops::Deref;
+use widestring::widecstr;
 
 /// Typedef of a special unsigned integer type that may represent a task id.
 ///
@@ -73,44 +76,47 @@ impl<C: VTable> Deref for CSEzTaskVTable<C> {
 /// correctly manage its lifetime. Destroying it before it has executed on this
 /// pass will leave a dangling pointer in the task queue.
 pub type CSEzTask = CppClass<CSEzTaskType>;
-//const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x1C);
+const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x18);
 
-impl CSEzTaskClass for CSEzTask {}
+impl CSEzTaskTrait for CSEzTask {}
 
 #[repr(C)]
 pub struct CSEzTaskType {
     fd4_task_base: FD4TaskBaseType,
-    proxy: CSEzTaskProxy,
+    proxy: *mut CSEzTaskProxy,
 }
-//const _: () = assert!(std::mem::size_of::<CSEzTaskType>() == 0x14);
+const _: () = assert!(std::mem::size_of::<CSEzTaskType>() == 0x10);
 
 impl CSEzTaskType {
+    pub fn get_task_group(&self) -> CSTaskGroup {
+        unsafe { (*self.proxy).task_group }
+    }
+}
+impl CSEzTask {
     pub fn new(task_group: CSTaskGroup) -> Self {
-        let mut task = Self {
+        let proxy = Box::new(CSEzTaskProxy::from_data(CSEzTaskProxyType {
             fd4_task_base: Default::default(),
-            proxy: CSEzTaskProxy {
-                owner: std::ptr::null(),
-                task_group,
-            },
+            owner: std::ptr::null(),
+            task_group,
+        }));
+        let task_type = CSEzTaskType {
+            fd4_task_base: Default::default(),
+            proxy: Box::leak(proxy),
         };
-        task.proxy.owner = &task as *const CSEzTaskType;
+        let mut task = Self::from_data(task_type);
+        unsafe { (*task.proxy).owner = &task as *const CSEzTask };
         task
     }
 }
 
-impl Default for CSEzTaskType {
-    fn default() -> Self {
-        let mut task = Self {
-            fd4_task_base: Default::default(),
-            proxy: CSEzTaskProxy {
-                owner: std::ptr::null(),
-                task_group: CSTaskGroup::INVALID,
-            },
-        };
-        task.proxy.owner = &task as *const CSEzTaskType;
-        task
+impl Drop for CSEzTaskType {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Box::from_raw(self.proxy);
+        }
     }
 }
+
 impl Deref for CSEzTaskType {
     type Target = FD4TaskBaseType;
 
@@ -125,22 +131,22 @@ impl VTable for CSEzTaskType {
 }
 
 impl<C: VTable> CSEzTaskVTable<C>
-    where
-        CppClass<C>: CSEzTaskClass,
+where
+    CppClass<C>: CSEzTaskTrait,
 {
     pub const fn new() -> Self {
-        Self  {
+        Self {
             fd4task_base_vtable: FD4TaskBaseVTable::new(),
-            eztask_execute: <CppClass<C> as CSEzTaskClass>::eztask_execute,
-            register_task: <CppClass<C> as CSEzTaskClass>::register_task,
-            free_task: <CppClass<C> as CSEzTaskClass>::free_task,
+            eztask_execute: <CppClass<C> as CSEzTaskTrait>::eztask_execute,
+            register_task: <CppClass<C> as CSEzTaskTrait>::register_task,
+            free_task: <CppClass<C> as CSEzTaskTrait>::free_task,
         }
     }
 }
-impl DLRuntimeClass for CSEzTask {
+impl DLRuntimeClassTrait for CSEzTask {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
         static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
-            crate::from::DLRF::DLRuntimeClass::new(DLRuntimeClassType::new(
+            crate::from::DLRF::DLRuntimeClass::from_data(DLRuntimeClassType::new(
                 cstr!("CSEzTask"),
                 widecstr!("CSEzTask"),
             ));
@@ -148,14 +154,14 @@ impl DLRuntimeClass for CSEzTask {
     }
 }
 
-impl FD4TaskBaseClass for CSEzTask {
+impl FD4TaskBaseTrait for CSEzTask {
     extern "C" fn execute(&self, data: &FD4TaskData) {
         todo!("{data:?}")
     }
 }
-impl FD4ComponentBaseClass for CSEzTask {}
+impl FD4ComponentBaseTrait for CSEzTask {}
 
-pub trait CSEzTaskClass: FD4TaskBaseClass {
+pub trait CSEzTaskTrait: FD4TaskBaseTrait {
     extern "C" fn eztask_execute(&self, data: &FD4TaskData) {
         self.execute(data)
     }
@@ -167,13 +173,64 @@ pub trait CSEzTaskClass: FD4TaskBaseClass {
     }
 }
 
-#[repr(C, packed(1))]
-pub struct CSEzTaskProxy {
-    owner: *const CSEzTaskType,
+#[repr(C)]
+pub struct CSEzTaskProxyVTable<C: VTable> {
+    pub fd4task_base_vtable: FD4TaskBaseVTable<C>,
+}
+const _: () = assert!(std::mem::size_of::<CSEzTaskVTable<CSEzTaskType>>() == 0x30);
+
+impl<C: VTable> Deref for CSEzTaskProxyVTable<C> {
+    type Target = FD4TaskBaseVTable<C>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.fd4task_base_vtable
+    }
+}
+
+type CSEzTaskProxy = CppClass<CSEzTaskProxyType>;
+const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0x20);
+
+#[repr(C)]
+pub struct CSEzTaskProxyType {
+    fd4_task_base: FD4TaskBaseType,
+    owner: *const CSEzTask,
     task_group: CSTaskGroup,
 }
-const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0xC);
 const _: () = assert!(std::mem::size_of::<CSTaskGroup>() == 0x4);
+
+impl<C: VTable> CSEzTaskProxyVTable<C>
+where
+    CppClass<C>: FD4TaskBaseTrait,
+{
+    pub const fn new() -> Self {
+        Self {
+            fd4task_base_vtable: FD4TaskBaseVTable::new(),
+        }
+    }
+}
+
+impl FD4TaskBaseTrait for CSEzTaskProxy {
+    extern "C" fn execute(&self, data: &FD4TaskData) {
+        unsafe { (*self.owner).eztask_execute(data) }
+    }
+}
+
+impl FD4ComponentBaseTrait for CSEzTaskProxy {}
+
+impl DLRuntimeClassTrait for CSEzTaskProxy {
+    extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
+        static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =
+            crate::from::DLRF::DLRuntimeClass::from_data(DLRuntimeClassType::new(
+                cstr!("CSEzTaskProxy"),
+                widecstr!("CSEzTaskProxy"),
+            ));
+        &DL_RUNTIME_CLASS
+    }
+}
+impl VTable for CSEzTaskProxyType {
+    type Table = CSEzTaskProxyVTable<CSEzTaskProxyType>;
+    const TABLE: &'static Self::Table = &CSEzTaskProxyVTable::new();
+}
 
 impl CSEzTaskProxy {
     pub fn get_task_group(&self) -> CSTaskGroup {

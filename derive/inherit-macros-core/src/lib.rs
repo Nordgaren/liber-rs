@@ -128,7 +128,7 @@ fn has_repr_c_attr(input: &DeriveInput) -> Result<(), Error> {
                         tokens
                     ),
                 ))
-            }
+            };
         }
     }
     Err(Error::new(

@@ -1,10 +1,10 @@
 use std::fmt::{Debug, Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 pub mod from;
 
-pub use inhert_macros_derive::CSEzTask;
 pub use cstr::cstr;
+pub use inhert_macros_derive::CSEzTask;
 pub use widestring::widecstr;
 
 pub type DestructorFn<C> = extern "C" fn(&CppClass<C>);
@@ -23,7 +23,7 @@ pub struct CppClass<C: VTable> {
 }
 
 impl<C: VTable> CppClass<C> {
-    pub const fn new(data: C) -> Self {
+    pub const fn from_data(data: C) -> Self {
         Self {
             vtable: C::TABLE,
             data,
@@ -42,5 +42,11 @@ impl<C: VTable> Deref for CppClass<C> {
 
     fn deref(&self) -> &Self::Target {
         &self.data
+    }
+}
+
+impl<C: VTable> DerefMut for CppClass<C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
     }
 }

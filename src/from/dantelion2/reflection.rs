@@ -22,7 +22,6 @@ pub struct DLRuntimeClassVTable<C: VTable> {
     free_base: FreeBaseFn<C>,
     class_size: ClassSizeFn<C>,
 }
-
 const _: () = assert!(std::mem::size_of::<DLRuntimeClassVTable<DLRuntimeClassType>>() == 0x48);
 
 impl<C: VTable> DLRuntimeClassVTable<C>
@@ -50,7 +49,6 @@ pub struct DLRuntimeClassType {
     _class_name: &'static c_char,
     _class_name_w: &'static u16,
 }
-
 const _: () = assert!(std::mem::size_of::<DLRuntimeClassType>() == 0x10);
 
 impl VTable for DLRuntimeClassType {
