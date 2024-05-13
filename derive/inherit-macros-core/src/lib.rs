@@ -2,10 +2,12 @@
 
 mod tests;
 
+use std::str::FromStr;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
 use syn::{parse2, Data, DeriveInput, Error, Fields};
+use syn::punctuated::Punctuated;
 
 pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
     inherit_cs_ez_task_internal(input).unwrap_or_else(|e| e.to_compile_error())
@@ -17,15 +19,38 @@ fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error>
     let ident = get_structure_name(&input)?;
 
     is_repr_c(&input)?;
-    let fields = check_and_get_fields(&input)?;
+    let mut fields = check_and_get_fields(&input)?;
+
+    let fields = match fields {
+        Fields::Named(ref mut n) => {
+            let mut fields_iter = n.named.iter();
+            fields_iter.next();
+            let mut fields = Punctuated::new();
+
+            while let Some(field) = fields_iter.next() {
+                fields.push(field.clone())
+            }
+
+            let mut names = vec![];
+
+            for field in &fields {
+                names.push(field.ident.as_ref().unwrap().to_string())
+            }
+
+            n.named = fields;
+
+            (TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(), TokenStream::from_str(&names.join(", ")).unwrap())
+        }
+        Fields::Unnamed(_) => (TokenStream::new(), TokenStream::new()),
+        Fields::Unit => unreachable!(),
+    };
 
     let tokenstream = inherit_cs_easy_task(ident, fields);
     Ok(tokenstream)
 }
 
-fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
-    let field_list = fields.to_token_stream();
-    eprintln!("{field_list}");
+fn inherit_cs_easy_task(ident: String, fields: (TokenStream, TokenStream)) -> TokenStream {
+    let (field_types , fields) = fields;
 
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
@@ -55,26 +80,19 @@ fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
         pub struct #vtable_name {
             get_runtime_class: extern "C" fn(&#class_name_ident) -> &'static liber_rs::from::DLRF::DLRuntimeClass,
             destructor: extern "C" fn(&#class_name_ident),
-            execute: extern "C" fn(&#class_name_ident, &FD4TaskData),
-            eztask_execute: extern "C" fn(&#class_name_ident, &FD4TaskData),
-            register_task: extern "C" fn(&#class_name_ident, task_group: CSTaskGroup),
+            execute: extern "C" fn(&#class_name_ident, &liber_rs::from::FD4::FD4TaskData),
+            eztask_execute: extern "C" fn(&#class_name_ident, &liber_rs::from::FD4::FD4TaskData),
+            register_task: extern "C" fn(&#class_name_ident, task_group: liber_rs::from::CS::CSTaskGroup),
             free_task: extern "C" fn(&#class_name_ident),
         }
-        // impl<C: liber_rs::VTable> std::ops::Deref for #vtable_name<C> {
-        //     type Target = liber_rs::from::CS::CSEzTaskVTable<C>;
-        //
-        //     fn deref(&self) -> &Self::Target {
-        //          &self.cs_ez_task_vtable
-        //     }
-        // }
     };
     let impls = quote! {
         impl #class_name_ident {
-            pub fn new() -> Self {
+            pub fn new(#field_types) -> Self {
                 let task_type = liber_rs::from::CS::CSEzTaskType::new(std::ptr::null_mut());
                 Self(liber_rs::CppClass::<
                     #class_name_type_ident,
-                >::from_data(#class_name_type_ident { task: task_type }))
+                >::from_data(#class_name_type_ident { task: task_type, #fields }))
             }
         }
         impl #vtable_name {
@@ -169,15 +187,13 @@ fn has_repr_c_attr(input: &DeriveInput) -> Result<(), Error> {
     ))
 }
 
-fn check_and_get_fields(input: &DeriveInput) -> Result<&Fields, Error> {
+fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
     let fields = match &input.data {
         Data::Struct(s) => {
             let first = match &s.fields {
                 Fields::Named(n) => n.named.first().unwrap(),
                 Fields::Unnamed(u) => u.unnamed.first().unwrap(),
-                Fields::Unit => {
-                    return Err(Error::new(input.span(), "Unit types are not supported."))
-                }
+                Fields::Unit => return Err(Error::new(input.span(), "Unit types are not supported.")),
             };
 
             if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
@@ -187,14 +203,12 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<&Fields, Error> {
                 ));
             }
 
-            &s.fields
+            s.fields.clone()
         }
-        _ => {
-            return Err(Error::new(
+        _ => return Err(Error::new(
                 input.span(),
                 "Only structures are supported for inheriting `CSEzTask`.",
-            ))
-        }
+            )),
     };
 
     Ok(fields)

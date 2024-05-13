@@ -20,9 +20,9 @@ use proc_macro_error::proc_macro_error;
 /// > `Deref` implementations that deref the newtype into the underlying `CppClass<C>` as well as a
 /// a implementation that derefs your custom type into `CSEzTaskType`. This is to mimic the C++ inheritance.
 /// api.
-/// > A function called `new` for both your custom type and generated newtype which take in a CSTaskGroup and
-/// that is all, so it doesn't support extended structures at all, right now, but could with a few modifications
-/// to the derive macro.
+/// > A function called `new` for both your custom type and generated newtype which take in all fields
+/// in the user defined structure after the CSEzTaskType. This does not support user defined newtypes/tuple
+/// types with additional fields (beyond the required CSEzTaskType).
 /// > An implementation for the `DLRuntimeClassTrait` trait and a `DLRuntimeClass` for your class.
 /// > A compile time check to enforce that your class implements `CSEzTaskTrait`
 #[proc_macro_error]
