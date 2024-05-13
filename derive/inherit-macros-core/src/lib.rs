@@ -9,6 +9,11 @@ use syn::spanned::Spanned;
 use syn::{parse2, Data, DeriveInput, Error, Fields};
 use syn::punctuated::Punctuated;
 
+struct Params {
+    names: TokenStream,
+    field_types: TokenStream,
+}
+
 pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
     inherit_cs_ez_task_internal(input).unwrap_or_else(|e| e.to_compile_error())
 }
@@ -19,38 +24,16 @@ fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error>
     let ident = get_structure_name(&input)?;
 
     is_repr_c(&input)?;
-    let mut fields = check_and_get_fields(&input)?;
+    let fields = check_and_get_fields(&input)?;
 
-    let fields = match fields {
-        Fields::Named(ref mut n) => {
-            let mut fields_iter = n.named.iter();
-            fields_iter.next();
-            let mut fields = Punctuated::new();
+    let params = get_params(&fields);
 
-            while let Some(field) = fields_iter.next() {
-                fields.push(field.clone())
-            }
-
-            let mut names = vec![];
-
-            for field in &fields {
-                names.push(field.ident.as_ref().unwrap().to_string())
-            }
-
-            n.named = fields;
-
-            (TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(), TokenStream::from_str(&names.join(", ")).unwrap())
-        }
-        Fields::Unnamed(_) => (TokenStream::new(), TokenStream::new()),
-        Fields::Unit => unreachable!(),
-    };
-
-    let tokenstream = inherit_cs_easy_task(ident, fields);
+    let tokenstream = inherit_cs_easy_task(ident, params);
     Ok(tokenstream)
 }
 
-fn inherit_cs_easy_task(ident: String, fields: (TokenStream, TokenStream)) -> TokenStream {
-    let (field_types , fields) = fields;
+fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
+    let Params { names, field_types } = fields;
 
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
@@ -92,7 +75,7 @@ fn inherit_cs_easy_task(ident: String, fields: (TokenStream, TokenStream)) -> To
                 let task_type = liber_rs::from::CS::CSEzTaskType::new(std::ptr::null_mut());
                 Self(liber_rs::CppClass::<
                     #class_name_type_ident,
-                >::from_data(#class_name_type_ident { task: task_type, #fields }))
+                >::from_data(#class_name_type_ident { task: task_type, #names }))
             }
         }
         impl #vtable_name {
@@ -212,4 +195,31 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
     };
 
     Ok(fields)
+}
+
+fn get_params(fields: &Fields) -> Params {
+    match fields {
+        Fields::Named(n) => {
+            let mut fields_iter = n.named.iter();
+            fields_iter.next();
+            let mut fields = Punctuated::new();
+
+            while let Some(field) = fields_iter.next() {
+                fields.push(field.clone())
+            }
+
+            let mut names = vec![];
+
+            for field in &fields {
+                names.push(field.ident.as_ref().unwrap().to_string())
+            }
+
+            let mut n = n.clone();
+            n.named = fields;
+
+            Params { names: TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(), field_types: TokenStream::from_str(&names.join(", ")).unwrap() }
+        }
+        Fields::Unnamed(_) => Params { names: TokenStream::new(), field_types: TokenStream::new() },
+        Fields::Unit => unreachable!(),
+    }
 }
