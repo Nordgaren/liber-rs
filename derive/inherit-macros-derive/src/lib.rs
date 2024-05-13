@@ -19,9 +19,10 @@ use proc_macro_error::proc_macro_error;
 /// `VTable` instead of `Type`, as well as the associated implementation of the `VTable` for your type.
 /// > `Deref` implementations that deref the newtype into the underlying `CppClass<C>` as well as a
 /// a implementation that derefs your custom type into `CSEzTaskType`. This is to mimic the C++ inheritance.
-/// api. A third implementation that derefs the `VTable` type into `CSEzTaskVTable`.
-/// > A function called `new` for both your custom type and generated newtyp which take in all the fields
-/// in your type as arguments and assigns them to a newly constructed type.
+/// api.
+/// > A function called `new` for both your custom type and generated newtype which take in a CSTaskGroup and
+/// that is all, so it doesn't support extended structures at all, right now, but could with a few modifications
+/// to the derive macro.
 /// > An implementation for the `DLRuntimeClassTrait` trait and a `DLRuntimeClass` for your class.
 /// > A compile time check to enforce that your class implements `CSEzTaskTrait`
 #[proc_macro_error]
