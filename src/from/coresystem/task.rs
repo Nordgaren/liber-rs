@@ -53,10 +53,10 @@ impl CSEzTask {
 
 #[repr(C)]
 pub struct CSEzTaskVTable<C: VTable> {
-    pub fd4task_base_vtable: FD4TaskBaseVTable<C>,
-    pub eztask_execute: EztaskExecuteFn<C>,
-    pub register_task: RegisterTaskFn<C>,
-    pub free_task: FreeTaskFn<C>,
+    fd4task_base_vtable: FD4TaskBaseVTable<C>,
+    eztask_execute: EztaskExecuteFn<C>,
+    register_task: RegisterTaskFn<C>,
+    free_task: FreeTaskFn<C>,
 }
 const _: () = assert!(std::mem::size_of::<CSEzTaskVTable<CSEzTaskType>>() == 0x30);
 
@@ -139,6 +139,7 @@ where
         }
     }
 }
+
 impl DLRuntimeClassTrait for CSEzTask {
     extern "C" fn get_runtime_class(&self) -> &'static crate::from::DLRF::DLRuntimeClass {
         static DL_RUNTIME_CLASS: crate::from::DLRF::DLRuntimeClass =

@@ -52,16 +52,21 @@ fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
         }
     };
     let vtable = quote! {
-        pub struct #vtable_name<C: liber_rs::VTable> {
-            cs_ez_task_vtable: liber_rs::from::CS::CSEzTaskVTable<C>,
+        pub struct #vtable_name {
+            get_runtime_class: extern "C" fn(&#class_name_ident) -> &'static liber_rs::from::DLRF::DLRuntimeClass,
+            destructor: extern "C" fn(&#class_name_ident),
+            execute: extern "C" fn(&#class_name_ident, &FD4TaskData),
+            eztask_execute: extern "C" fn(&#class_name_ident, &FD4TaskData),
+            register_task: extern "C" fn(&#class_name_ident, task_group: CSTaskGroup),
+            free_task: extern "C" fn(&#class_name_ident),
         }
-        impl<C: liber_rs::VTable> std::ops::Deref for #vtable_name<C> {
-            type Target = liber_rs::from::CS::CSEzTaskVTable<C>;
-
-            fn deref(&self) -> &Self::Target {
-                 &self.cs_ez_task_vtable
-            }
-        }
+        // impl<C: liber_rs::VTable> std::ops::Deref for #vtable_name<C> {
+        //     type Target = liber_rs::from::CS::CSEzTaskVTable<C>;
+        //
+        //     fn deref(&self) -> &Self::Target {
+        //          &self.cs_ez_task_vtable
+        //     }
+        // }
     };
     let impls = quote! {
         impl #class_name_ident {
@@ -72,13 +77,22 @@ fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
                 >::from_data(#class_name_type_ident { task: task_type }))
             }
         }
-        impl #vtable_name<#class_name_type_ident> {
+        impl #vtable_name {
             pub const fn new() -> Self {
-                Self { cs_ez_task_vtable: unsafe { std::mem::transmute(liber_rs::from::CS::CSEzTaskVTable::new()) } }
+                unsafe {
+                    Self {
+                        get_runtime_class: <#class_name_ident as liber_rs::from::FD4::DLRuntimeClassTrait>::get_runtime_class,
+                        destructor: <#class_name_ident as liber_rs::from::FD4::FD4ComponentBaseTrait>::destructor,
+                        execute: <#class_name_ident as liber_rs::from::FD4::FD4TaskBaseTrait>::execute,
+                        eztask_execute: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::eztask_execute,
+                        register_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::register_task,
+                        free_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::free_task,
+                    }
+                }
             }
         }
         impl liber_rs::VTable for #class_name_type_ident {
-            type Table = #vtable_name<#class_name_type_ident>;
+            type Table = #vtable_name;
             const TABLE: &'static Self::Table = &#vtable_name::new();
         }
     };
@@ -97,12 +111,11 @@ fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
     let checks = quote! {
         const _:() = {
             const fn is_cs_ez_task(t: &dyn liber_rs::from::CS::CSEzTaskTrait) {}
-            struct TestWrapper(#class_name_ident);
-            const fn new_test_wrapper() -> TestWrapper {
-                unsafe { TestWrapper(core::mem::MaybeUninit::uninit().assume_init()) }
+            const fn new_test_type() -> #class_name_ident {
+                unsafe { core::mem::MaybeUninit::uninit().assume_init() }
             }
-            let t = new_test_wrapper();
-            is_cs_ez_task(&t.0);
+            let t = new_test_type();
+            is_cs_ez_task(&t);
             std::mem::forget(t);
         };
     };

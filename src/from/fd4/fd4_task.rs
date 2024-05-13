@@ -19,8 +19,8 @@ const _: () = assert!(std::mem::size_of::<CppClass<FD4TaskBaseType>>() == 0x10);
 
 #[repr(C)]
 pub struct FD4TaskBaseVTable<C: VTable> {
-    pub fd4component_base_vtable: FD4ComponentBaseVTable<C>,
-    pub execute: ExecuteFn<C>,
+    fd4component_base_vtable: FD4ComponentBaseVTable<C>,
+    execute: ExecuteFn<C>,
 }
 const _: () = assert!(std::mem::size_of::<FD4TaskBaseVTable<FD4TaskBaseType>>() == 0x18);
 impl<C: VTable> FD4TaskBaseVTable<C>

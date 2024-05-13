@@ -19,7 +19,7 @@ where
 }
 #[repr(C)]
 pub struct CppClass<C: VTable> {
-    vtable: &'static C::Table,
+    pub vtable: &'static C::Table,
     data: C,
 }
 

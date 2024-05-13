@@ -15,8 +15,8 @@ pub struct FD4ComponentBaseVTable<C: VTable> {
     /// Get the runtime class object
     ///
     /// * `return`: `DLRF::DLRuntimeClass*` pointer to the runtime class
-    pub get_runtime_class: GetRuntimeClassFn<C>,
-    pub destructor: DestructorFn<C>,
+    get_runtime_class: GetRuntimeClassFn<C>,
+    destructor: DestructorFn<C>,
 }
 const _: () = assert!(std::mem::size_of::<FD4ComponentBaseVTable<FD4ComponentBaseType>>() == 0x10);
 
