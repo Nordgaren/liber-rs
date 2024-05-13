@@ -17,18 +17,29 @@ fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error>
     let ident = get_structure_name(&input)?;
 
     is_repr_c(&input)?;
-    check_structure(&input)?;
+    let fields = check_and_get_fields(&input)?;
 
-    let tokenstream = inherit_cs_easy_task(ident);
+    let tokenstream = inherit_cs_easy_task(ident, fields);
     Ok(tokenstream)
 }
 
-fn inherit_cs_easy_task(ident: String) -> TokenStream {
+fn inherit_cs_easy_task(ident: String, fields: &Fields) -> TokenStream {
+    let field_list = fields.to_token_stream();
+    eprintln!("{field_list}");
+
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
     let class_name_ident = format_ident!("{class_name}");
     let vtable_name = format_ident!("{class_name}VTable");
     let mut tokenstream = quote! {
+         impl std::ops::Deref for #class_name_type_ident {
+            type Target = liber_rs::from::CS::CSEzTaskType;
+
+            fn deref(&self) -> &Self::Target {
+                &self.task
+            }
+        }
+
         #[repr(transparent)]
         pub struct #class_name_ident(liber_rs::CppClass<#class_name_type_ident>);
 
@@ -53,20 +64,16 @@ fn inherit_cs_easy_task(ident: String) -> TokenStream {
         }
     };
     let impls = quote! {
-        impl #class_name_type_ident {
-            pub fn new(task_group: liber_rs::from::CS::CSTaskGroup) -> Self {
-                Self { task: CSEzTaskType::new(task_group) }
-            }
-        }
         impl #class_name_ident {
-            pub fn new(task_group: liber_rs::from::CS::CSTaskGroup) -> Self {
-                Self(liber_rs::CppClass::<#class_name_type_ident>::new(
-                    #class_name_type_ident::new(task_group),
-                ))
+            pub fn new() -> Self {
+                let task_type = liber_rs::from::CS::CSEzTaskType::new(std::ptr::null_mut());
+                Self(liber_rs::CppClass::<
+                    #class_name_type_ident,
+                >::from_data(#class_name_type_ident { task: task_type }))
             }
         }
         impl #vtable_name<#class_name_type_ident> {
-            pub const fn new( ) -> Self {
+            pub const fn new() -> Self {
                 Self { cs_ez_task_vtable: unsafe { std::mem::transmute(liber_rs::from::CS::CSEzTaskVTable::new()) } }
             }
         }
@@ -76,10 +83,10 @@ fn inherit_cs_easy_task(ident: String) -> TokenStream {
         }
     };
     let reflection = quote! {
-        impl liber_rs::from::FD4::DLRuntimeClass for #class_name_ident {
+        impl liber_rs::from::FD4::DLRuntimeClassTrait for #class_name_ident {
             extern "C" fn get_runtime_class(&self) -> &'static liber_rs::from::DLRF::DLRuntimeClass {
                 static DL_RUNTIME_CLASS: liber_rs::from::DLRF::DLRuntimeClass =
-                    liber_rs::from::DLRF::DLRuntimeClass::new(liber_rs::from::DLRF::DLRuntimeClassType::new(
+                    liber_rs::from::DLRF::DLRuntimeClass::from_data(liber_rs::from::DLRF::DLRuntimeClassType::new(
                         liber_rs::cstr!(#class_name),
                         liber_rs::widecstr!(#class_name),
                     ));
@@ -87,8 +94,20 @@ fn inherit_cs_easy_task(ident: String) -> TokenStream {
             }
         }
     };
+    let checks = quote! {
+        const _:() = {
+            const fn is_cs_ez_task(t: &dyn liber_rs::from::CS::CSEzTaskTrait) {}
+            struct TestWrapper(#class_name_ident);
+            const fn new_test_wrapper() -> TestWrapper {
+                unsafe { TestWrapper(core::mem::MaybeUninit::uninit().assume_init()) }
+            }
+            let t = new_test_wrapper();
+            is_cs_ez_task(&t.0);
+            std::mem::forget(t);
+        };
+    };
 
-    tokenstream.append_all(&[vtable, impls, reflection]);
+    tokenstream.append_all(&[vtable, impls, reflection, checks]);
     tokenstream
 }
 
@@ -137,8 +156,8 @@ fn has_repr_c_attr(input: &DeriveInput) -> Result<(), Error> {
     ))
 }
 
-fn check_structure(input: &DeriveInput) -> Result<(), Error> {
-    match &input.data {
+fn check_and_get_fields(input: &DeriveInput) -> Result<&Fields, Error> {
+    let fields = match &input.data {
         Data::Struct(s) => {
             let first = match &s.fields {
                 Fields::Named(n) => n.named.first().unwrap(),
@@ -154,6 +173,8 @@ fn check_structure(input: &DeriveInput) -> Result<(), Error> {
                     "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
                 ));
             }
+
+            &s.fields
         }
         _ => {
             return Err(Error::new(
@@ -161,7 +182,7 @@ fn check_structure(input: &DeriveInput) -> Result<(), Error> {
                 "Only structures are supported for inheriting `CSEzTask`.",
             ))
         }
-    }
+    };
 
-    Ok(())
+    Ok(fields)
 }

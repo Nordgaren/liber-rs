@@ -67,13 +67,18 @@ pub struct FD4TaskBaseType {
     unk: *const c_void,
 }
 const _: () = assert!(std::mem::size_of::<FD4TaskBaseType>() == 0x8);
-
-impl Default for FD4TaskBaseType {
-    fn default() -> Self {
+impl FD4TaskBaseType {
+    pub fn new() -> Self {
         Self {
             base: Default::default(),
             unk: std::ptr::null(),
         }
+    }
+}
+
+impl Default for FD4TaskBaseType {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -92,10 +97,6 @@ impl VTable for FD4TaskBaseType {
 
 pub trait FD4TaskBaseTrait: FD4ComponentBaseTrait {
     extern "C" fn execute(&self, data: &FD4TaskData);
-    extern "C" fn get_runtime_class(&self, data: &FD4TaskData) {
-        todo!("{data:?}")
-    }
-    extern "C" fn destructor(&self) {}
 }
 
 impl FD4TaskBaseTrait for FD4TaskBase {

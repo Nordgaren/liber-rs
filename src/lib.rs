@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 pub mod from;
 
 pub use cstr::cstr;
+pub use from::details::symbols::*;
 pub use inhert_macros_derive::CSEzTask;
 pub use widestring::widecstr;
 

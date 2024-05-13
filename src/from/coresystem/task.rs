@@ -1,10 +1,7 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
 use crate::from::DLRF::DLRuntimeClassType;
-use crate::from::FD4::{
-    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType,
-    FD4TaskBaseVTable, FD4TaskData,
-};
-use crate::{CppClass, VTable};
+use crate::from::FD4::{DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
+use crate::{CppClass, get_base_address, VTable};
 use cstr::cstr;
 use std::ops::Deref;
 use widestring::widecstr;
@@ -44,6 +41,15 @@ pub type RegisterTaskFn<C> = extern "C" fn(_this: &CppClass<C>, task_group: CSTa
 /// Keep the task lifetime @link CS::CSEzTask disclaimer @endlink in mind
 /// when freeing or destroying a task.
 pub type FreeTaskFn<C> = extern "C" fn(_this: &CppClass<C>);
+pub type CSEzTask = CppClass<CSEzTaskType>;
+const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x18);
+
+impl CSEzTask {
+    pub fn new() -> Self {
+        let task_type = CSEzTaskType::new(std::ptr::null_mut());
+        Self::from_data(task_type)
+    }
+}
 
 #[repr(C)]
 pub struct CSEzTaskVTable<C: VTable> {
@@ -75,11 +81,6 @@ impl<C: VTable> Deref for CSEzTaskVTable<C> {
 /// is registered and executing. Use from::unique_ptr from from_unique_ptr.hpp to
 /// correctly manage its lifetime. Destroying it before it has executed on this
 /// pass will leave a dangling pointer in the task queue.
-pub type CSEzTask = CppClass<CSEzTaskType>;
-const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x18);
-
-impl CSEzTaskTrait for CSEzTask {}
-
 #[repr(C)]
 pub struct CSEzTaskType {
     fd4_task_base: FD4TaskBaseType,
@@ -88,27 +89,22 @@ pub struct CSEzTaskType {
 const _: () = assert!(std::mem::size_of::<CSEzTaskType>() == 0x10);
 
 impl CSEzTaskType {
+    pub fn new(proxy: *mut CSEzTaskProxy) -> Self {
+        Self {
+            fd4_task_base: Default::default(),
+            proxy,
+        }
+    }
+    pub fn get_proxy(&self) -> *mut CSEzTaskProxy {
+        self.proxy
+    }
+    pub fn set_proxy(&mut self, proxy: *mut CSEzTaskProxy) {
+        self.proxy = proxy;
+    }
     pub fn get_task_group(&self) -> CSTaskGroup {
         unsafe { (*self.proxy).task_group }
     }
 }
-impl CSEzTask {
-    pub fn new(task_group: CSTaskGroup) -> Self {
-        let proxy = Box::new(CSEzTaskProxy::from_data(CSEzTaskProxyType {
-            fd4_task_base: Default::default(),
-            owner: std::ptr::null(),
-            task_group,
-        }));
-        let task_type = CSEzTaskType {
-            fd4_task_base: Default::default(),
-            proxy: Box::leak(proxy),
-        };
-        let mut task = Self::from_data(task_type);
-        unsafe { (*task.proxy).owner = &task as *const CSEzTask };
-        task
-    }
-}
-
 impl Drop for CSEzTaskType {
     fn drop(&mut self) {
         unsafe {
@@ -156,23 +152,29 @@ impl DLRuntimeClassTrait for CSEzTask {
 
 impl FD4TaskBaseTrait for CSEzTask {
     extern "C" fn execute(&self, data: &FD4TaskData) {
-        todo!("{data:?}")
+        self.eztask_execute(data)
     }
 }
-impl FD4ComponentBaseTrait for CSEzTask {}
+impl FD4ComponentBaseTrait for CSEzTask {
+    extern "C" fn destructor(&self) {
+        self.free_task();
+    }
+}
 
 pub trait CSEzTaskTrait: FD4TaskBaseTrait {
-    extern "C" fn eztask_execute(&self, data: &FD4TaskData) {
-        self.execute(data)
-    }
+    extern "C" fn eztask_execute(&self, data: &FD4TaskData);
     extern "C" fn register_task(&self, task_group: CSTaskGroup) {
-        todo!("{:?}", task_group)
+        let register_task: extern "C" fn(_this: &Self, task_group: CSTaskGroup) = unsafe { std::mem::transmute(get_base_address() + 0xE71C70) };
+        register_task(self, task_group)
     }
     extern "C" fn free_task(&self) {
-        todo!()
+        let free_task: extern "C" fn(_this: &Self) = unsafe { std::mem::transmute(get_base_address() + 0xE71D60) };
+        free_task(self)
     }
 }
-
+/* CSEzTaskProxy */
+pub type CSEzTaskProxy = CppClass<CSEzTaskProxyType>;
+const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0x20);
 #[repr(C)]
 pub struct CSEzTaskProxyVTable<C: VTable> {
     pub fd4task_base_vtable: FD4TaskBaseVTable<C>,
@@ -186,17 +188,33 @@ impl<C: VTable> Deref for CSEzTaskProxyVTable<C> {
         &self.fd4task_base_vtable
     }
 }
-
-type CSEzTaskProxy = CppClass<CSEzTaskProxyType>;
-const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0x20);
-
 #[repr(C)]
 pub struct CSEzTaskProxyType {
     fd4_task_base: FD4TaskBaseType,
     owner: *const CSEzTask,
     task_group: CSTaskGroup,
 }
-const _: () = assert!(std::mem::size_of::<CSTaskGroup>() == 0x4);
+
+impl CSEzTaskProxyType {
+    pub fn new(task_group: CSTaskGroup) -> Self {
+        Self {
+            fd4_task_base: Default::default(),
+            owner: std::ptr::null(),
+            task_group,
+        }
+    }
+    pub fn owner(&self) -> *const CSEzTask {
+        self.owner
+    }
+    pub fn set_owner(&mut self, task: *const CSEzTask) {
+        self.owner = task;
+    }
+}
+impl Default for CSEzTaskProxyType {
+    fn default() -> Self {
+        Self::new(CSTaskGroup::INVALID)
+    }
+}
 
 impl<C: VTable> CSEzTaskProxyVTable<C>
 where
@@ -227,6 +245,11 @@ impl DLRuntimeClassTrait for CSEzTaskProxy {
         &DL_RUNTIME_CLASS
     }
 }
+impl CSEzTaskTrait for CSEzTask {
+    extern "C" fn eztask_execute(&self, _data: &FD4TaskData) {}
+
+}
+
 impl VTable for CSEzTaskProxyType {
     type Table = CSEzTaskProxyVTable<CSEzTaskProxyType>;
     const TABLE: &'static Self::Table = &CSEzTaskProxyVTable::new();

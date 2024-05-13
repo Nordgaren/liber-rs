@@ -175,3 +175,4 @@ pub enum CSTaskGroup {
     FrameEnd,
     SIZE,
 }
+const _: () = assert!(std::mem::size_of::<CSTaskGroup>() == 0x4);
