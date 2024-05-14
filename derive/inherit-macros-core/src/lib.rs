@@ -72,7 +72,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
     let impls = quote! {
         impl #class_name_ident {
             pub fn new(#field_types) -> Self {
-                let task_type = liber_rs::from::CS::CSEzTaskType::new(std::ptr::null_mut());
+                let task_type = liber_rs::from::CS::CSEzTaskType::new();
                 Self(liber_rs::CppClass::<
                     #class_name_type_ident,
                 >::from_data(#class_name_type_ident { task: task_type, #names }))

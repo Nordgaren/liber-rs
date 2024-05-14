@@ -85,10 +85,10 @@ pub struct CSEzTaskType {
 const _: () = assert!(std::mem::size_of::<CSEzTaskType>() == 0x10);
 
 impl CSEzTaskType {
-    pub fn new(proxy: *mut CSEzTaskProxy) -> Self {
+    pub fn new() -> Self {
         Self {
             fd4_task_base: Default::default(),
-            proxy,
+            proxy: std::ptr::null_mut(),
         }
     }
     pub fn get_proxy(&self) -> *mut CSEzTaskProxy {
