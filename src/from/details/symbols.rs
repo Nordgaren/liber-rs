@@ -7,5 +7,5 @@ extern "system" {
 
 pub fn get_base_address() -> usize {
     static BASE_ADDRESS: OnceLock<usize> = OnceLock::new();
-    *BASE_ADDRESS.get_or_init(|| unsafe { GetModuleHandleA(0 as *const u8) })
+    *BASE_ADDRESS.get_or_init(|| unsafe { GetModuleHandleA(std::ptr::null::<u8>()) })
 }

@@ -2,12 +2,12 @@
 
 mod tests;
 
-use std::str::FromStr;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use std::str::FromStr;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{parse2, Data, DeriveInput, Error, Fields};
-use syn::punctuated::Punctuated;
 
 struct Params {
     names: TokenStream,
@@ -176,7 +176,9 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
             let first = match &s.fields {
                 Fields::Named(n) => n.named.first().unwrap(),
                 Fields::Unnamed(u) => u.unnamed.first().unwrap(),
-                Fields::Unit => return Err(Error::new(input.span(), "Unit types are not supported.")),
+                Fields::Unit => {
+                    return Err(Error::new(input.span(), "Unit types are not supported."))
+                }
             };
 
             if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
@@ -188,10 +190,12 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
 
             s.fields.clone()
         }
-        _ => return Err(Error::new(
+        _ => {
+            return Err(Error::new(
                 input.span(),
                 "Only structures are supported for inheriting `CSEzTask`.",
-            )),
+            ))
+        }
     };
 
     Ok(fields)
@@ -217,9 +221,15 @@ fn get_params(fields: &Fields) -> Params {
             let mut n = n.clone();
             n.named = fields;
 
-            Params { names: TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(), field_types: TokenStream::from_str(&names.join(", ")).unwrap() }
+            Params {
+                names: TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(),
+                field_types: TokenStream::from_str(&names.join(", ")).unwrap(),
+            }
         }
-        Fields::Unnamed(_) => Params { names: TokenStream::new(), field_types: TokenStream::new() },
+        Fields::Unnamed(_) => Params {
+            names: TokenStream::new(),
+            field_types: TokenStream::new(),
+        },
         Fields::Unit => unreachable!(),
     }
 }

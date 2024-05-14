@@ -1,7 +1,10 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
 use crate::from::DLRF::DLRuntimeClassType;
-use crate::from::FD4::{DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
-use crate::{CppClass, get_base_address, VTable};
+use crate::from::FD4::{
+    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType,
+    FD4TaskBaseVTable, FD4TaskData,
+};
+use crate::{get_base_address, CppClass, VTable};
 use cstr::cstr;
 use std::ops::Deref;
 use widestring::widecstr;
@@ -43,13 +46,6 @@ pub type RegisterTaskFn<C> = extern "C" fn(_this: &CppClass<C>, task_group: CSTa
 pub type FreeTaskFn<C> = extern "C" fn(_this: &CppClass<C>);
 pub type CSEzTask = CppClass<CSEzTaskType>;
 const _: () = assert!(std::mem::size_of::<CSEzTask>() == 0x18);
-
-impl CSEzTask {
-    pub fn new() -> Self {
-        let task_type = CSEzTaskType::new(std::ptr::null_mut());
-        Self::from_data(task_type)
-    }
-}
 
 #[repr(C)]
 pub struct CSEzTaskVTable<C: VTable> {
@@ -105,13 +101,6 @@ impl CSEzTaskType {
         unsafe { (*self.proxy).task_group }
     }
 }
-impl Drop for CSEzTaskType {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = Box::from_raw(self.proxy);
-        }
-    }
-}
 
 impl Deref for CSEzTaskType {
     type Target = FD4TaskBaseType;
@@ -165,11 +154,13 @@ impl FD4ComponentBaseTrait for CSEzTask {
 pub trait CSEzTaskTrait: FD4TaskBaseTrait {
     extern "C" fn eztask_execute(&self, data: &FD4TaskData);
     extern "C" fn register_task(&self, task_group: CSTaskGroup) {
-        let register_task: extern "C" fn(_this: &Self, task_group: CSTaskGroup) = unsafe { std::mem::transmute(get_base_address() + 0xE71C70) };
+        let register_task: extern "C" fn(_this: &Self, task_group: CSTaskGroup) =
+            unsafe { std::mem::transmute(get_base_address() + 0xE71C70) };
         register_task(self, task_group)
     }
     extern "C" fn free_task(&self) {
-        let free_task: extern "C" fn(_this: &Self) = unsafe { std::mem::transmute(get_base_address() + 0xE71D60) };
+        let free_task: extern "C" fn(_this: &Self) =
+            unsafe { std::mem::transmute(get_base_address() + 0xE71D60) };
         free_task(self)
     }
 }
@@ -248,7 +239,6 @@ impl DLRuntimeClassTrait for CSEzTaskProxy {
 }
 impl CSEzTaskTrait for CSEzTask {
     extern "C" fn eztask_execute(&self, _data: &FD4TaskData) {}
-
 }
 
 impl VTable for CSEzTaskProxyType {
