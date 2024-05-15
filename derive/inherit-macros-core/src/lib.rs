@@ -181,7 +181,7 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
                 }
             };
 
-            if first.ty.to_token_stream().to_string() != "CSEzTaskType" {
+            if !first.ty.to_token_stream().to_string().ends_with("CSEzTaskType") {
                 return Err(Error::new(
                     first.ty.span(),
                     "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
