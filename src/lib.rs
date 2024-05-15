@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 pub mod from;
+pub(crate) mod include;
 
 pub use cstr::cstr;
 pub use from::details::symbols::*;
