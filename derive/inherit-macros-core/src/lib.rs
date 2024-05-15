@@ -60,6 +60,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
         }
     };
     let vtable = quote! {
+        #[repr(C)]
         pub struct #vtable_name {
             get_runtime_class: extern "C" fn(&#class_name_ident) -> &'static liber_rs::from::DLRF::DLRuntimeClass,
             destructor: extern "C" fn(&#class_name_ident),
