@@ -8,5 +8,6 @@ members = ["derive/inherit-macros-derive", "derive/inherit-macros-core"]
 
 [dependencies]
 inhert-macros-derive = { version = "0.1.0", path = "derive/inherit-macros-derive" }
+inherit-macros-derive = { version = "0.1.0", path = "derive/inherit-macros-derive" }
 cstr = "0.2.12"
 widestring = "1.1.0"
