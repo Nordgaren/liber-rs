@@ -81,15 +81,13 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
         }
         impl #vtable_name {
             pub const fn new() -> Self {
-                unsafe {
-                    Self {
-                        get_runtime_class: <#class_name_ident as liber_rs::from::FD4::DLRuntimeClassTrait>::get_runtime_class,
-                        destructor: <#class_name_ident as liber_rs::from::FD4::FD4ComponentBaseTrait>::destructor,
-                        execute: <#class_name_ident as liber_rs::from::FD4::FD4TaskBaseTrait>::execute,
-                        eztask_execute: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::eztask_execute,
-                        register_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::register_task,
-                        free_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::free_task,
-                    }
+                Self {
+                    get_runtime_class: <#class_name_ident as liber_rs::from::FD4::DLRuntimeClassTrait>::get_runtime_class,
+                    destructor: <#class_name_ident as liber_rs::from::FD4::FD4ComponentBaseTrait>::destructor,
+                    execute: <#class_name_ident as liber_rs::from::FD4::FD4TaskBaseTrait>::execute,
+                    eztask_execute: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::eztask_execute,
+                    register_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::register_task,
+                    free_task: <#class_name_ident as liber_rs::from::CS::CSEzTaskTrait>::free_task,
                 }
             }
         }
@@ -182,7 +180,12 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
                 }
             };
 
-            if !first.ty.to_token_stream().to_string().ends_with("CSEzTaskType") {
+            if !first
+                .ty
+                .to_token_stream()
+                .to_string()
+                .ends_with("CSEzTaskType")
+            {
                 return Err(Error::new(
                     first.ty.span(),
                     "First field of a class that inherits `CSEzTask` MUST be of type `CSEzTaskType`. Additional fields can go AFTER this field.",
@@ -195,7 +198,7 @@ fn check_and_get_fields(input: &DeriveInput) -> Result<Fields, Error> {
             return Err(Error::new(
                 input.span(),
                 "Only structures are supported for inheriting `CSEzTask`.",
-            ))
+            ));
         }
     };
 
