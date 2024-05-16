@@ -2,15 +2,13 @@
 
 mod tests;
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{
-    parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, ItemStruct, Path,
-    PathSegment, Type, Visibility,
-};
+use syn::{parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, ItemStruct, Path, PathSegment, Type, Visibility, FieldsUnnamed};
+use syn::token::Comma;
 
 // Attr Macro
 pub fn inherit_cs_ez_task_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -100,7 +98,7 @@ fn enforce_first_field(input: &mut ItemStruct) -> Result<&Fields, Error> {
         },
         Fields::Unnamed(u) => {
             if !check_first_field(u.unnamed.first().unwrap()) {
-                u.unnamed.push_value(Field {
+                u.unnamed.insert(0, Field {
                     attrs: vec![],
                     vis: Visibility::Inherited,
                     ident: None,
@@ -110,7 +108,15 @@ fn enforce_first_field(input: &mut ItemStruct) -> Result<&Fields, Error> {
             }
         }
         Fields::Unit => {
-            return Err(Error::new(input.span(), "Unit types are not supported."));
+            let mut fields = FieldsUnnamed { paren_token: Default::default(), unnamed: Default::default() };
+            fields.unnamed.push_value(Field {
+                attrs: vec![],
+                vis: Visibility::Inherited,
+                ident: None,
+                colon_token: None,
+                ty: Type::Verbatim(quote!(liber_rs::from::CS::CSEzTaskType)),
+            });
+            input.fields = Fields::Unnamed(fields);
         }
     };
 
@@ -121,7 +127,7 @@ fn enforce_first_field(input: &mut ItemStruct) -> Result<&Fields, Error> {
 struct Params {
     names: TokenStream,
     field_types: TokenStream,
-    task_field_name: Ident,
+    task_field_name: Option<Ident>,
 }
 
 pub fn inherit_cs_ez_task_impl(input: TokenStream) -> TokenStream {
@@ -150,15 +156,44 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
     let class_name_type_ident = format_ident!("{class_name}Type");
     let class_name_ident = format_ident!("{class_name}");
     let vtable_name = format_ident!("{class_name}VTable");
-    let mut tokenstream = quote! {
-         impl std::ops::Deref for #class_name_type_ident {
-            type Target = liber_rs::from::CS::CSEzTaskType;
-
-            fn deref(&self) -> &Self::Target {
-                &self.#task_field_name
+    let struct_type_specific = match task_field_name {
+        None => quote!{
+            impl #class_name_ident {
+                pub fn new(#field_types) -> Self {
+                    let task = liber_rs::from::CS::CSEzTaskType::new();
+                    Self(liber_rs::CppClass::<
+                        #class_name_type_ident,
+                    >::from_data(#class_name_type_ident(task, #names)))
+                }
             }
-        }
+            impl std::ops::Deref for #class_name_type_ident {
+                type Target = liber_rs::from::CS::CSEzTaskType;
 
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
+            }
+        },
+        Some(task_field_name) => quote!{
+            impl #class_name_ident {
+                pub fn new(#field_types) -> Self {
+                    let #task_field_name = liber_rs::from::CS::CSEzTaskType::new();
+                    Self(liber_rs::CppClass::<
+                        #class_name_type_ident,
+                    >::from_data(#class_name_type_ident { #task_field_name, #names }))
+                }
+            }
+            impl std::ops::Deref for #class_name_type_ident {
+                type Target = liber_rs::from::CS::CSEzTaskType;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.#task_field_name
+                }
+            }
+        },
+    };
+
+    let mut tokenstream = quote! {
         #[repr(transparent)]
         pub struct #class_name_ident(liber_rs::CppClass<#class_name_type_ident>);
 
@@ -182,14 +217,6 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
         }
     };
     let impls = quote! {
-        impl #class_name_ident {
-            pub fn new(#field_types) -> Self {
-                let #task_field_name = liber_rs::from::CS::CSEzTaskType::new();
-                Self(liber_rs::CppClass::<
-                    #class_name_type_ident,
-                >::from_data(#class_name_type_ident { #task_field_name, #names }))
-            }
-        }
         impl #vtable_name {
             pub const fn new() -> Self {
                 Self {
@@ -206,6 +233,12 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
             type Table = #vtable_name;
             const TABLE: &'static Self::Table = &#vtable_name::new();
         }
+        impl liber_rs::from::FD4::FD4TaskBaseTrait for #class_name_ident {
+            extern "C" fn execute(&self, data: &FD4TaskData) {
+                self.eztask_execute(data)
+            }
+        }
+        impl liber_rs::from::FD4::FD4ComponentBaseTrait for #class_name_ident {}
     };
     let reflection = quote! {
         impl liber_rs::from::FD4::DLRuntimeClassTrait for #class_name_ident {
@@ -231,7 +264,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
         };
     };
 
-    tokenstream.append_all(&[vtable, impls, reflection, checks]);
+    tokenstream.append_all(&[struct_type_specific, vtable, impls, reflection, checks]);
     tokenstream
 }
 
@@ -326,7 +359,7 @@ fn get_params(fields: &Fields) -> Params {
         Fields::Named(n) => {
             let mut fields_iter = n.named.iter();
             let task_field_name = fields_iter.next().unwrap().clone().ident.unwrap();
-            let mut fields = Punctuated::new();
+            let mut fields:Punctuated<Field, Comma> = Punctuated::new();
 
             while let Some(field) = fields_iter.next() {
                 fields.push(field.clone())
@@ -338,20 +371,34 @@ fn get_params(fields: &Fields) -> Params {
                 names.push(field.ident.as_ref().unwrap().to_string())
             }
 
-            let mut n = n.clone();
-            n.named = fields;
-
             Params {
-                field_types: TokenStream::from_str(&n.named.to_token_stream().to_string()).unwrap(),
+                field_types: TokenStream::from_str(&fields.to_token_stream().to_string()).unwrap(),
                 names: TokenStream::from_str(&names.join(", ")).unwrap(),
-                task_field_name
+                task_field_name: Some(task_field_name)
             }
         }
-        Fields::Unnamed(_) => Params {
-            names: TokenStream::new(),
-            field_types: TokenStream::new(),
-            task_field_name: Ident::new("", Span::call_site()),
-        },
+        Fields::Unnamed(u) => {
+            let mut fields_iter = u.unnamed.iter();
+            fields_iter.next();
+            let mut fields:Punctuated<Field, Comma> = Punctuated::new();
+            let mut names = vec![];
+
+            let count = 1;
+            while let Some(field) = fields_iter.next() {
+                let field_name = format!("f{count}");
+                let mut new_field = field.clone();
+                new_field.ident = Some(format_ident!("{field_name}"));
+                fields.push(new_field);
+                names.push(field_name);
+
+            }
+
+            Params {
+                field_types: TokenStream::from_str(&fields.to_token_stream().to_string()).unwrap(),
+                names: TokenStream::from_str(&names.join(", ")).unwrap(),
+                task_field_name: None
+            }
+        }
         Fields::Unit => unreachable!(),
     }
 }
