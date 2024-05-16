@@ -7,6 +7,7 @@ use crate::from::FD4::{
 use crate::{get_base_address, CppClass, VTable};
 use cstr::cstr;
 use std::ops::Deref;
+use std::ffi::c_void;
 use widestring::widecstr;
 
 /// Typedef of a special unsigned integer type that may represent a task id.
@@ -164,9 +165,13 @@ pub trait CSEzTaskTrait: FD4TaskBaseTrait {
         free_task(self)
     }
 }
-/* CSEzTaskProxy */
+/// An internal proxy object for CS::CSEzTask instances inside ELDEN
+/// RING's task management system.
+/// This is just an example type.
 pub type CSEzTaskProxy = CppClass<CSEzTaskProxyType>;
 const _: () = assert!(std::mem::size_of::<CSEzTaskProxy>() == 0x20);
+/// `CSEzTaskProxy` vtable. This table currently serves as an example for the layout of the `CSEzTaskProxy`
+/// vtable.
 #[repr(C)]
 pub struct CSEzTaskProxyVTable<C: VTable> {
     pub fd4task_base_vtable: FD4TaskBaseVTable<C>,
@@ -180,6 +185,8 @@ impl<C: VTable> Deref for CSEzTaskProxyVTable<C> {
         &self.fd4task_base_vtable
     }
 }
+/// `CSEzTaskProxy` data type. This struct is expected to be the first struct in any user defined struct
+/// that is trying to inherit from `CSEzTaskProxy` (Currently unsupported).
 #[repr(C)]
 pub struct CSEzTaskProxyType {
     fd4_task_base: FD4TaskBaseType,
@@ -220,10 +227,24 @@ where
 }
 
 impl FD4TaskBaseTrait for CSEzTaskProxy {
+    /// Executes the proxied task.
+    ///
+    /// # Arguments
+    ///
+    /// * `data`: a struct with additional data passed to the task
     extern "C" fn execute(&self, data: &FD4TaskData) {
         unsafe { (*self.owner).eztask_execute(data) }
     }
 }
+impl CSEzTaskProxy {
+    /// Get the task group this proxy was registered at.
+    ///
+    /// returns: a value from the CS::CSTaskGroup enum
+    pub fn get_task_group(&self) -> CSTaskGroup {
+        self.task_group
+    }
+}
+
 
 impl FD4ComponentBaseTrait for CSEzTaskProxy {}
 
@@ -245,9 +266,33 @@ impl VTable for CSEzTaskProxyType {
     type Table = CSEzTaskProxyVTable<CSEzTaskProxyType>;
     const TABLE: &'static Self::Table = &CSEzTaskProxyVTable::new();
 }
+ /// A child task executed by tasks and steppers in ELDEN RING.
+pub type EZChildStepBase = CppClass<EzChildStepBaseType>;
+#[repr(C)]
+pub struct  EzChildStepBaseType {
+    task: *const CSEzTask,
+    run: bool,
+    unk: *const c_void,
+}
 
-impl CSEzTaskProxy {
-    pub fn get_task_group(&self) -> CSTaskGroup {
-        self.task_group
-    }
+#[repr(C)]
+pub struct  CSTaskImp {
+    task: *const CSTask,
+    run: bool,
+    unk: *const c_void,
+}
+// impl FD4SingletonTrait for CSTaskImp {
+//     fn instance() -> &'static Self {
+//         static INSTANCE: OnceCell<CSTaskImp> = OnceCell::new();
+//
+//         INSTANCE.get_or_init(|| CSTaskImp {
+//             task: std::ptr::null(),
+//             run: false,
+//             unk: std::ptr::null(),
+//         })
+//     }
+// }
+
+#[repr(C)]
+pub struct  CSTask {
 }
