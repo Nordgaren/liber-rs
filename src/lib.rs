@@ -5,7 +5,6 @@ pub mod from;
 
 pub use cstr::cstr;
 pub use from::details::symbols::*;
-pub use inherit_macros_derive::CSEzTask;
 pub use widestring::widecstr;
 
 pub type DestructorFn<C> = extern "C" fn(&CppClass<C>);
