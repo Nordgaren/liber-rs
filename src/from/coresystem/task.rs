@@ -1,10 +1,13 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
 use crate::from::DLRF::DLRuntimeClassType;
-use crate::from::FD4::{DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBase, FD4TaskBaseTrait, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
+use crate::from::FD4::{
+    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBase, FD4TaskBaseTrait, FD4TaskBaseType,
+    FD4TaskBaseVTable, FD4TaskData,
+};
 use crate::{get_base_address, CppClass, VTable};
 use cstr::cstr;
-use std::ops::Deref;
 use std::ffi::c_void;
+use std::ops::Deref;
 use widestring::widecstr;
 
 /// Typedef of a special unsigned integer type that may represent a task id.
@@ -249,7 +252,6 @@ impl CSEzTaskProxy {
     }
 }
 
-
 impl FD4ComponentBaseTrait for CSEzTaskProxy {}
 
 impl DLRuntimeClassTrait for CSEzTaskProxy {
@@ -270,17 +272,17 @@ impl VTable for CSEzTaskProxyType {
     type Table = CSEzTaskProxyVTable<CSEzTaskProxyType>;
     const TABLE: &'static Self::Table = &CSEzTaskProxyVTable::new();
 }
- /// A child task executed by tasks and steppers in ELDEN RING.
+/// A child task executed by tasks and steppers in ELDEN RING.
 pub type EZChildStepBase = CppClass<EzChildStepBaseType>;
 #[repr(C)]
-pub struct  EzChildStepBaseType {
+pub struct EzChildStepBaseType {
     task: *const CSEzTask,
     run: bool,
     unk: *const c_void,
 }
 
 #[repr(C)]
-pub struct  CSTaskImp {
+pub struct CSTaskImp {
     task: *const CSTask,
     run: bool,
     unk: *const c_void,
@@ -298,5 +300,4 @@ pub struct  CSTaskImp {
 // }
 
 #[repr(C)]
-pub struct  CSTask {
-}
+pub struct CSTask {}

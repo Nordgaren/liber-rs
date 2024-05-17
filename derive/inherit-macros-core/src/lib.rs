@@ -2,14 +2,17 @@
 
 mod tests;
 
-use std::collections::HashMap;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use std::collections::HashMap;
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, ItemStruct, Path, PathSegment, Type, Visibility, FieldsUnnamed, LitStr};
 use syn::token::Comma;
+use syn::{
+    parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, FieldsUnnamed,
+    ItemStruct, LitStr, Path, PathSegment, Type, Visibility,
+};
 
 // Attr Macro
 /// The only function outside `CSEzTaskTrait` functions that can be overwritten. `FD4TaskBaseTrait::execute`
@@ -50,9 +53,19 @@ fn parse_args(attr: TokenStream, ident: Ident) -> Result<AttrArgs, Error> {
     for arg in args {
         let mut split = arg.split('=');
         let func = split.next().unwrap().trim();
-        let result = dict.insert(func, split.next().unwrap_or(&format!("{ident}::{func}")).trim().to_string());
+        let result = dict.insert(
+            func,
+            split
+                .next()
+                .unwrap_or(&format!("{ident}::{func}"))
+                .trim()
+                .to_string(),
+        );
         if result.is_some() {
-            return Err(Error::new(syn::spanned::Spanned::span(&attr), format!("{} specified twice. Can only be specified once!", func)))
+            return Err(Error::new(
+                syn::spanned::Spanned::span(&attr),
+                format!("{} specified twice. Can only be specified once!", func),
+            ));
         }
     }
 
@@ -117,28 +130,39 @@ fn enforce_first_field(input: &mut ItemStruct) -> Result<&Fields, Error> {
     }
 
     match &mut input.fields {
-        Fields::Named(n) => if !check_first_field(n.named.first().unwrap()) {
-            n.named.insert(0, Field {
-                attrs: vec![],
-                vis: Visibility::Inherited,
-                ident: Some(format_ident!("task")),
-                colon_token: None,
-                ty: Type::Verbatim(quote!(liber_rs::from::CS::CSEzTaskType)),
-            })
-        },
+        Fields::Named(n) => {
+            if !check_first_field(n.named.first().unwrap()) {
+                n.named.insert(
+                    0,
+                    Field {
+                        attrs: vec![],
+                        vis: Visibility::Inherited,
+                        ident: Some(format_ident!("task")),
+                        colon_token: None,
+                        ty: Type::Verbatim(quote!(liber_rs::from::CS::CSEzTaskType)),
+                    },
+                )
+            }
+        }
         Fields::Unnamed(u) => {
             if !check_first_field(u.unnamed.first().unwrap()) {
-                u.unnamed.insert(0, Field {
-                    attrs: vec![],
-                    vis: Visibility::Inherited,
-                    ident: None,
-                    colon_token: None,
-                    ty: Type::Verbatim(quote!(liber_rs::from::CS::CSEzTaskType)),
-                })
+                u.unnamed.insert(
+                    0,
+                    Field {
+                        attrs: vec![],
+                        vis: Visibility::Inherited,
+                        ident: None,
+                        colon_token: None,
+                        ty: Type::Verbatim(quote!(liber_rs::from::CS::CSEzTaskType)),
+                    },
+                )
             }
         }
         Fields::Unit => {
-            let mut fields = FieldsUnnamed { paren_token: Default::default(), unnamed: Default::default() };
+            let mut fields = FieldsUnnamed {
+                paren_token: Default::default(),
+                unnamed: Default::default(),
+            };
             fields.unnamed.push_value(Field {
                 attrs: vec![],
                 vis: Visibility::Inherited,
@@ -180,7 +204,11 @@ fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error>
 }
 
 fn inherit_cs_easy_task(ident: String, fields: Params, args: AttrArgs) -> TokenStream {
-    let Params { names, field_types, task_field_name } = fields;
+    let Params {
+        names,
+        field_types,
+        task_field_name,
+    } = fields;
 
     let class_name = &ident[..ident.len() - 4];
     let class_name_type_ident = format_ident!("{class_name}Type");
@@ -259,12 +287,11 @@ fn inherit_cs_easy_task(ident: String, fields: Params, args: AttrArgs) -> TokenS
                     }
                 }
             }
-        },
+        }
         None => quote! {
             impl liber_rs::from::FD4::FD4ComponentBaseTrait for #class_name_ident {}
-        }
+        },
     };
-
 
     let impls = quote! {
         impl #vtable_name {
@@ -410,7 +437,6 @@ fn get_params(fields: &Fields) -> Params {
             for field in fields_iter {
                 fields.push(field.clone());
                 names.push(field.ident.as_ref().unwrap().to_string());
-
             }
 
             Params {
