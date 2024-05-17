@@ -101,7 +101,7 @@ pub trait FD4TaskBaseTrait: FD4ComponentBaseTrait {
 
 impl FD4TaskBaseTrait for FD4TaskBase {
     extern "C" fn execute(&self, data: &FD4TaskData) {
-        todo!("{data:?}")
+        unimplemented!("{data:?}")
     }
 }
 

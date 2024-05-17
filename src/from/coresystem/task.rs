@@ -1,9 +1,6 @@
 use crate::from::CS::taskgroups::CSTaskGroup;
 use crate::from::DLRF::DLRuntimeClassType;
-use crate::from::FD4::{
-    DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBaseTrait, FD4TaskBaseType,
-    FD4TaskBaseVTable, FD4TaskData,
-};
+use crate::from::FD4::{DLRuntimeClassTrait, FD4ComponentBaseTrait, FD4TaskBase, FD4TaskBaseTrait, FD4TaskBaseType, FD4TaskBaseVTable, FD4TaskData};
 use crate::{get_base_address, CppClass, VTable};
 use cstr::cstr;
 use std::ops::Deref;
@@ -103,6 +100,12 @@ impl CSEzTaskType {
     }
 }
 
+impl Default for CSEzTaskType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Deref for CSEzTaskType {
     type Target = FD4TaskBaseType;
 
@@ -149,6 +152,7 @@ impl FD4TaskBaseTrait for CSEzTask {
 impl FD4ComponentBaseTrait for CSEzTask {
     extern "C" fn destructor(&self) {
         self.free_task();
+        unsafe { FD4TaskBase::destructor(&*(self as *const CSEzTask as *const FD4TaskBase)) };
     }
 }
 

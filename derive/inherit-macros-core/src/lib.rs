@@ -2,35 +2,65 @@
 
 mod tests;
 
-use proc_macro2::{Ident, TokenStream};
+use std::collections::HashMap;
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, ItemStruct, Path, PathSegment, Type, Visibility, FieldsUnnamed};
+use syn::{parse2, AttrStyle, Attribute, Data, DeriveInput, Error, Field, Fields, ItemStruct, Path, PathSegment, Type, Visibility, FieldsUnnamed, LitStr};
 use syn::token::Comma;
 
 // Attr Macro
+/// The only function outside `CSEzTaskTrait` functions that can be overwritten. `FD4TaskBaseTrait::execute`
+/// is overridden by `CSEzTask` and declared `final`, so, it cannot be overridden by the inheritor.
+/// The user has to implement `CSEzTaskTrait` themselves, as they have to implement `eztask_execute`.
+#[derive(Debug)]
+struct AttrArgs {
+    destructor: Option<String>,
+}
+
 pub fn inherit_cs_ez_task_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     inherit_cs_ez_task_attr_internal(attr, item).unwrap_or_else(|e| e.to_compile_error())
 }
 
 fn inherit_cs_ez_task_attr_internal(
-    _attr: TokenStream,
+    attr: TokenStream,
     item: TokenStream,
 ) -> Result<TokenStream, Error> {
     let mut input = parse2::<ItemStruct>(item)?;
     let checks = enforce_repr_c(&mut input)?;
     let fields = enforce_first_field(&mut input)?;
-    let params = get_params(&fields);
+    let params = get_params(fields);
 
     let ident = input.ident;
     input.ident = format_ident!("{}Type", ident);
 
-    let inherited = inherit_cs_easy_task(input.ident.to_string(), params);
+    let args = parse_args(attr, ident)?;
+    let inherited = inherit_cs_easy_task(input.ident.to_string(), params, args);
     let mut tokenstream = input.to_token_stream();
     tokenstream.append_all([inherited, checks]);
     Ok(tokenstream)
+}
+
+fn parse_args(attr: TokenStream, ident: Ident) -> Result<AttrArgs, Error> {
+    let attr = attr.to_string();
+    let args = attr.split(',');
+    let mut dict = HashMap::new();
+    for arg in args {
+        let mut split = arg.split('=');
+        let func = split.next().unwrap().trim();
+        let result = dict.insert(func, split.next().unwrap_or(&format!("{ident}::{func}")).trim().to_string());
+        if result.is_some() {
+            return Err(Error::new(syn::spanned::Spanned::span(&attr), format!("{} specified twice. Can only be specified once!", func)))
+        }
+    }
+
+    let args = AttrArgs {
+        destructor: dict.remove("destructor"),
+    };
+    eprintln!("{args:?}");
+    Ok(args)
 }
 
 fn enforce_repr_c(input: &mut ItemStruct) -> Result<TokenStream, Error> {
@@ -144,12 +174,12 @@ fn inherit_cs_ez_task_internal(input: TokenStream) -> Result<TokenStream, Error>
 
     let params = get_params(&fields);
 
-    let mut tokenstream = inherit_cs_easy_task(ident, params);
+    let mut tokenstream = inherit_cs_easy_task(ident, params, AttrArgs { destructor: None });
     tokenstream.append_all(checks);
     Ok(tokenstream)
 }
 
-fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
+fn inherit_cs_easy_task(ident: String, fields: Params, args: AttrArgs) -> TokenStream {
     let Params { names, field_types, task_field_name } = fields;
 
     let class_name = &ident[..ident.len() - 4];
@@ -157,7 +187,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
     let class_name_ident = format_ident!("{class_name}");
     let vtable_name = format_ident!("{class_name}VTable");
     let struct_type_specific = match task_field_name {
-        None => quote!{
+        None => quote! {
             impl #class_name_ident {
                 pub fn new(#field_types) -> Self {
                     let task = liber_rs::from::CS::CSEzTaskType::new();
@@ -174,7 +204,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
                 }
             }
         },
-        Some(task_field_name) => quote!{
+        Some(task_field_name) => quote! {
             impl #class_name_ident {
                 pub fn new(#field_types) -> Self {
                     let #task_field_name = liber_rs::from::CS::CSEzTaskType::new();
@@ -216,6 +246,26 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
             free_task: extern "C" fn(&#class_name_ident),
         }
     };
+
+    let fd4_component_impl = match args.destructor {
+        Some(d) => {
+            let str = LitStr::new(&d, Span::call_site());
+            let destructor = str.parse_with(Path::parse_mod_style).unwrap();
+            quote! {
+                impl FD4ComponentBaseTrait for #class_name_ident {
+                    extern "C" fn destructor(&self) {
+                        #destructor(self);
+                        unsafe { liber_rs::from::CS::CSEzTask::destructor(&*(self as *const #class_name_ident as *const liber_rs::from::CS::CSEzTask)) };
+                    }
+                }
+            }
+        },
+        None => quote! {
+            impl liber_rs::from::FD4::FD4ComponentBaseTrait for #class_name_ident {}
+        }
+    };
+
+
     let impls = quote! {
         impl #vtable_name {
             pub const fn new() -> Self {
@@ -238,7 +288,7 @@ fn inherit_cs_easy_task(ident: String, fields: Params) -> TokenStream {
                 self.eztask_execute(data)
             }
         }
-        impl liber_rs::from::FD4::FD4ComponentBaseTrait for #class_name_ident {}
+        #fd4_component_impl
     };
     let reflection = quote! {
         impl liber_rs::from::FD4::DLRuntimeClassTrait for #class_name_ident {
@@ -278,11 +328,6 @@ fn get_structure_name(input: &DeriveInput) -> Result<String, Error> {
     }
 
     Ok(ident)
-}
-
-#[repr(C)]
-struct Test {
-    test_one: String,
 }
 
 fn is_repr_c(input: &DeriveInput) -> Result<TokenStream, Error> {
@@ -359,44 +404,40 @@ fn get_params(fields: &Fields) -> Params {
         Fields::Named(n) => {
             let mut fields_iter = n.named.iter();
             let task_field_name = fields_iter.next().unwrap().clone().ident.unwrap();
-            let mut fields:Punctuated<Field, Comma> = Punctuated::new();
-
-            while let Some(field) = fields_iter.next() {
-                fields.push(field.clone())
-            }
-
+            let mut fields: Punctuated<Field, Comma> = Punctuated::new();
             let mut names = vec![];
 
-            for field in &fields {
-                names.push(field.ident.as_ref().unwrap().to_string())
+            for field in fields_iter {
+                fields.push(field.clone());
+                names.push(field.ident.as_ref().unwrap().to_string());
+
             }
 
             Params {
                 field_types: TokenStream::from_str(&fields.to_token_stream().to_string()).unwrap(),
                 names: TokenStream::from_str(&names.join(", ")).unwrap(),
-                task_field_name: Some(task_field_name)
+                task_field_name: Some(task_field_name),
             }
         }
         Fields::Unnamed(u) => {
             let mut fields_iter = u.unnamed.iter();
             fields_iter.next();
-            let mut fields:Punctuated<Field, Comma> = Punctuated::new();
+            let mut fields: Punctuated<Field, Comma> = Punctuated::new();
             let mut names = vec![];
 
             let count = 1;
-            while let Some(field) = fields_iter.next() {
+            for field in fields_iter {
                 let field_name = format!("f{count}");
                 let mut new_field = field.clone();
                 new_field.ident = Some(format_ident!("{field_name}"));
                 fields.push(new_field);
                 names.push(field_name);
-
             }
 
             Params {
                 field_types: TokenStream::from_str(&fields.to_token_stream().to_string()).unwrap(),
                 names: TokenStream::from_str(&names.join(", ")).unwrap(),
-                task_field_name: None
+                task_field_name: None,
             }
         }
         Fields::Unit => unreachable!(),
